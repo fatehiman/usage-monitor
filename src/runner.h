@@ -15,6 +15,11 @@ struct IndVal {
     std::string label;  // label after variables are filled in
     double num = 0;     // the number shown: percent, remain (bytes when scaled), or value
     std::string pre, post;  // text around the number: "$" / "%" / " GB" ... post "B" = bytes
+    bool history = true;    // false = not written to the history log (type = days)
+    // Usage spike alarm (spike_used / spike_minutes): alarm when the number goes DOWN by
+    // spikeUsed or more within at least spikeMinutes. 0 = no alarm for this indicator.
+    double spikeUsed = 0;
+    int spikeMinutes = 0;
 };
 
 struct Result {
@@ -24,6 +29,10 @@ struct Result {
     bool stale = false;    // inds are from an older successful run
     bool running = false;
     time_t updated = 0;    // time of the last successful run
+    // Last usage spike (src/spike.cpp). Shown as "!" next to the Updated time until the user
+    // clicks it. spikeAt = 0: no spike to show.
+    time_t spikeAt = 0;
+    std::string spikeText;
 };
 
 // On success: new inds, status "OK". On failure: old inds kept and marked stale,

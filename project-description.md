@@ -9,6 +9,7 @@ for example:
 - the home FTTH internet account (data left, days left),
 - Claude usage (5-hour and weekly limits),
 - API money balances (Soniox, DeepSeek, OpenRouter — shown in USD),
+- ElevenLabs credits left and days left until the plan renews or ends,
 - SMS provider balances (MsgWay, MihanSMS — shown in IRT; MihanSMS also shows
   the SMS left as a 2nd column),
 - a prepaid SIM or any account with a money balance.
@@ -98,6 +99,12 @@ the stack comparison.
   the default browser (see "Usage history and report" below).
 - Money balances (Soniox, DeepSeek) are `value` indicators with `prefix = $` and
   no `max`, so they show only the amount (`$3.89 left`), no pie and no percent.
+- **Usage spike alarm:** when the number of a service goes down a lot in a short
+  time (set per indicator in the `.conf`: `spike_used` + `spike_minutes`, e.g. 5 %
+  in 1 min, or 45 IRT in 10 min), the app plays a sound and shows a red **!** next
+  to the Updated time. The tooltip says what happened; a click on the cell clears it.
+- **Days left:** a service with a plan that ends (e.g. ElevenLabs) can show the days
+  left (indicator type `days`), orange / red when few days are left.
 - Small extras: `F5` = refresh all, `Esc` = close, double-click a row = open the
   service website (if `site` is set). Rows can not be selected (read-only table).
 
@@ -108,6 +115,7 @@ the stack comparison.
 | `ratio` | remaining / total | `25 GB / 500 GB` |
 | `value` | one number (balance, days, count) | `$24.56`, `12 days` |
 | `percent` | a percent | `25%` |
+| `days` | days left until a date | `23 days left (12/7 4:05)` |
 
 ## Services are defined in `.conf` files
 

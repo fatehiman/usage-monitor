@@ -466,6 +466,28 @@ bool formatIndicator(Ctx& c, const Section& ind, IndVal& out) {
         out.level = levelOf(ind, value);
         double mx;
         if (num(c, ind, "max", mx) == 1 && mx != 0) out.pie = value * 100 / mx;  // pie needs a maximum
+    } else if (type == "days") {
+        // Days left until a date (plan end / renewal), e.g. "23 days (12/7)".
+        const KV* d = ind.find("date");
+        std::string v;
+        if (!d) { c.err = "indicator " + ind.id + ": days needs 'date'"; return false; }
+        if (!expand(c, d->val, v)) return false;
+        time_t t = parseTime(v, c.s->tz);
+        if (!t) { c.err = "indicator " + ind.id + ": date is not a time: '" + trim(v).substr(0, 30) + "'"; return false; }
+        double days = (double)(t - time(nullptr)) / 86400.0;
+        if (days < 0) val = "expired";
+        else if (days < 1) val = std::to_string((int)(days * 24)) + " h";
+        else val = std::to_string((int)days) + ((int)days == 1 ? " day" : " days");
+        if (reset.empty()) {
+            const TimeZone& show = appTimeZone() ? *appTimeZone() : c.s->tz;
+            reset = U(shortTime(t, show, true, true));
+        }
+        out.num = days;
+        out.post = " days";
+        out.history = false;  // a countdown, not usage
+        out.level = levelOf(ind, days);
+        double mx;
+        if (num(c, ind, "max", mx) == 1 && mx != 0) out.pie = (days < 0 ? 0 : days) * 100 / mx;  // max = plan length in days
     } else {
         c.err = "indicator " + ind.id + ": unknown type '" + type + "'";
         return false;
@@ -479,6 +501,12 @@ bool formatIndicator(Ctx& c, const Section& ind, IndVal& out) {
     out.id = ind.id;
     out.label = label;
     out.tray = ind.get("tray") == "1";
+    double su;
+    if (parseNumber(ind.get("spike_used", "x"), su) && su > 0) {
+        out.spikeUsed = su;
+        out.spikeMinutes = atoi(ind.get("spike_minutes", "1").c_str());
+        if (out.spikeMinutes < 1) out.spikeMinutes = 1;
+    }
     if (ind.get("pie") == "0") out.pie = -1;
     if (out.pie > 100) out.pie = 100;
     if (out.pie < 0 && out.pie != -1) out.pie = 0;
@@ -501,7 +529,7 @@ bool runService(const Service& s, Result& r) {
         for (auto& ind : s.indicators) {
             if (ind.get("optional") == "1") {  // skip when its main value is empty
                 std::string v;
-                const char* keys[] = {"percent", "value", "remain", "used"};
+                const char* keys[] = {"percent", "value", "remain", "used", "date"};
                 bool empty = true;
                 for (const char* k : keys)
                     if (const KV* kv = ind.find(k)) { empty = expand(c, kv->val, v) && trim(v).empty(); break; }

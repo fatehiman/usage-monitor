@@ -1,4 +1,5 @@
-"""Makes res/app.ico (gauge) and services/*.ico (one colored dot per service). No extra libraries.
+"""Makes res/app.ico (gauge) and services/mihansms.ico (a colored dot: the site has no logo). No extra libraries.
+The other service icons are real logos, made with tools/logo_to_ico.py.
 Run: python -I tools/make_icons.py  (from the project root)
 """
 import math
@@ -66,15 +67,6 @@ def gauge(u, v):
     return (*col, 1.0)
 
 
-def dot(u, v):
-    r = math.hypot(u - 0.5, v - 0.5)
-    if r > 0.46:
-        return None
-    if r < 0.18:
-        return (255, 236, 220, 1.0)
-    return (217, 119, 87, 1.0)
-
-
 def ring_dot(col):
     """Plain colored disc with a light center (simple, no brand art)."""
     def shade(u, v):
@@ -115,10 +107,6 @@ if __name__ == "__main__":
     (root / "res").mkdir(exist_ok=True)
     (root / "services").mkdir(exist_ok=True)
     (root / "res" / "app.ico").write_bytes(ico(gauge))
-    (root / "services" / "claude.ico").write_bytes(ico(dot))
-    (root / "services" / "deepseek.ico").write_bytes(ico(ring_dot((77, 107, 254))))  # blue
-    (root / "services" / "soniox.ico").write_bytes(ico(ring_dot((32, 150, 140))))   # teal
-    (root / "services" / "msgway.ico").write_bytes(ico(ring_dot((230, 120, 30))))   # orange
+    # The other services use their real logos (tools/logo_to_ico.py). MihanSMS has no logo online.
     (root / "services" / "mihansms.ico").write_bytes(ico(ring_dot((70, 160, 60))))  # green
-    (root / "services" / "openrouter.ico").write_bytes(ico(ring_dot((100, 100, 120))))  # slate
     print("icons written")

@@ -11,12 +11,14 @@
 #include "history.h"
 #include "report.h"
 #include "runner.h"
+#include "spike.h"
 #include "tz.h"
 #include "util.h"
 
 #define WM_APP_TRAY   (WM_APP + 1)
 #define WM_APP_UPDATE (WM_APP + 2)  // a result changed
 #define WM_APP_RELOAD (WM_APP + 3)  // the service list changed
+#define WM_APP_SPIKE  (WM_APP + 4)  // a usage spike was found: play the sound
 
 enum { ID_OPEN = 101, ID_SETTINGS, ID_EXIT };
 enum { TIMER_RESUME = 1, TIMER_SPIN = 2 };
@@ -47,7 +49,7 @@ struct Cell {
     int color = CC_NORMAL;
     double pie = -1;  // -1 = draw text the normal way
 };
-static HFONT g_font;
+static HFONT g_font, g_boldFont;
 static HIMAGELIST g_imgs;
 static int g_indCols = 1;
 static std::vector<std::vector<Cell>> g_cells;  // [row][column]
@@ -56,6 +58,7 @@ static std::vector<HICON> g_rowIcons;  // service icon per row (drawn by us, wit
 static int g_iconSize = 16;
 static int g_tipCount = 0;
 static std::vector<std::wstring> g_rowTip;  // tooltip text of the Updated cell per row
+static std::vector<char> g_rowSpike;        // row shows the "!" spike badge next to the Updated time
 static int g_hotRow = -1, g_hotCol = -1;  // button (row, column) under the mouse
 static double g_spin = 0;
 
@@ -113,15 +116,22 @@ static DWORD WINAPI Worker(LPVOID) {
 
             bool ok = runService(svcs[i], r);
             r.running = false;
+            bool spike = false;
             if (ok) {  // usage history: one line per indicator in history\YYYY-MM-DD.tsv
                 historyAppend(svcs[i].file, r.inds, r.updated);
                 int day = displayDay(time(nullptr));
                 if (day != cleanDay) { historyCleanup(); cleanDay = day; }
+                spike = spikeCheck(svcs[i], r);
             }
             AcquireSRWLockExclusive(&g_lock);
+            if (!spike) {  // keep the badge as it is now (the user may have cleared it during the run)
+                r.spikeAt = g_results[i].spikeAt;
+                r.spikeText = g_results[i].spikeText;
+            }
             g_results[i] = r;
             ReleaseSRWLockExclusive(&g_lock);
             PostMessageW(g_main, WM_APP_UPDATE, 0, 0);
+            if (spike) PostMessageW(g_main, WM_APP_SPIKE, 0, 0);
 
             ULONGLONG interval = (ULONGLONG)svcs[i].intervalMin * 60000;
             if (!ok && interval > 5 * 60000) interval = 5 * 60000;  // retry sooner after an error
@@ -173,6 +183,35 @@ static void requestRefresh(int row) {
     ReleaseSRWLockExclusive(&g_lock);
     SetEvent(g_refreshEv);
     PostMessageW(g_main, WM_APP_UPDATE, 0, 0);
+}
+
+// The user clicked the "!" badge: the spike is seen, hide it.
+static void clearSpike(int row) {
+    AcquireSRWLockExclusive(&g_lock);
+    if (row >= 0 && row < (int)g_results.size()) {
+        g_results[row].spikeAt = 0;
+        g_results[row].spikeText.clear();
+    }
+    ReleaseSRWLockExclusive(&g_lock);
+    PostMessageW(g_main, WM_APP_UPDATE, 0, 0);
+}
+
+// [app] spike_sound = <file.wav> in usage-monitor.ini, else the Windows "Exclamation" sound.
+// winmm.dll is loaded only when a .wav file is set, and only for the moment of the sound.
+static void playSpikeSound() {
+    std::wstring wav = W(appSettings().spikeSound);
+    if (!wav.empty()) {
+        typedef BOOL(WINAPI * PlaySoundFn)(LPCWSTR, HMODULE, DWORD);
+        if (HMODULE m = LoadLibraryW(L"winmm.dll")) {
+            auto play = (PlaySoundFn)(void*)GetProcAddress(m, "PlaySoundW");
+            // Synchronous on purpose: the DLL is freed after it. The sound is short.
+            bool ok = play && play(wav.c_str(), nullptr, 0x00020000 /*SND_FILENAME*/ | 0x0002 /*SND_NODEFAULT*/);
+            FreeLibrary(m);
+            if (ok) return;
+        }
+        logLine("Cannot play spike_sound " + appSettings().spikeSound + ", using the Windows sound");
+    }
+    MessageBeep(MB_ICONEXCLAMATION);
 }
 
 // The report runs in its own short-lived process: "usage-monitor.exe --report <file>".
@@ -242,6 +281,7 @@ static void updateTip() {
         for (auto& v : r.inds)
             if (v.tray) line += (line.empty() ? "" : ", ") + v.text;
         if (!r.ok && r.status != "Waiting") line += (line.empty() ? "" : " - ") + std::string("error");
+        if (r.spikeAt) line = "(!) " + line;  // usage spike, not cleared yet
         if (!line.empty()) tip += L"\n" + W(g_services[i].name + ": " + line);
     }
     ReleaseSRWLockShared(&g_lock);
@@ -275,6 +315,9 @@ static void setFont(UINT dpi) {
     SendMessageW(g_list, WM_SETFONT, (WPARAM)f, TRUE);
     if (g_font) DeleteObject(g_font);
     g_font = f;
+    ncm.lfMessageFont.lfWeight = FW_BOLD;
+    if (g_boldFont) DeleteObject(g_boldFont);
+    g_boldFont = CreateFontIndirectW(&ncm.lfMessageFont);
 }
 
 static void setCell(int row, int col, const std::wstring& text) {
@@ -298,6 +341,19 @@ static int pieSize(const RECT& cell) {
 static int buttonSize(const RECT& cell) {
     int s = dpiScale(20), h = cell.bottom - cell.top - 2;
     return s < h ? s : h;
+}
+
+static int badgeSize() { return dpiScale(15); }
+
+// The "!" badge right of the Updated time (the text is left-aligned, so it follows the text width).
+static RECT badgeRect(int row) {
+    RECT c = cellRect(row, colUpdated());
+    wchar_t buf[64] = L"";
+    ListView_GetItemText(g_list, row, colUpdated(), buf, 64);
+    int s = badgeSize();
+    int x = c.left + dpiScale(6) + ListView_GetStringWidth(g_list, buf) + dpiScale(5);
+    int y = c.top + ((c.bottom - c.top) - s) / 2;
+    return RECT{x, y, x + s, y + s};
 }
 
 static RECT buttonRect(int row, int col) {
@@ -369,6 +425,9 @@ static void autoSizeColumns() {
         int hw = ListView_GetStringWidth(g_list, buf) + pad;
         if (isIndCol(c)) w += pieExtra;
         if (c == 0) w += g_iconSize + dpiScale(10);
+        if (c == colUpdated())
+            for (char sp : g_rowSpike)
+                if (sp) { w += badgeSize() + dpiScale(6); break; }
         ListView_SetColumnWidth(g_list, c, (w > hw ? w : hw) + pad / 2);
     }
     ListView_SetColumnWidth(g_list, colRefresh(), dpiScale(20) + dpiScale(10));
@@ -437,6 +496,7 @@ static void fillTable(bool rebuild) {
     g_cells.assign(svcs.size(), std::vector<Cell>(colCount()));
     g_rowRunning.assign(svcs.size(), 0);
     g_rowTip.assign(svcs.size(), L"");
+    g_rowSpike.assign(svcs.size(), 0);
     bool anyRunning = false;
     for (size_t i = 0; i < svcs.size(); i++) {
         const Result& r = res[i];
@@ -456,6 +516,11 @@ static void fillTable(bool rebuild) {
         g_cells[i][colUpdated()].color = r.ok ? CC_GOOD : failed ? CC_ALERT : CC_NORMAL;
         if (failed) g_rowTip[i] = W(r.status) + (when.empty() ? L"" : L"\r\nLast good update: " + when);
         else if (r.ok) g_rowTip[i] = L"OK, updated " + when;
+        if (r.spikeAt) {
+            g_rowSpike[i] = 1;
+            std::wstring at = shortTime(r.spikeAt, appTimeZone() ? *appTimeZone() : TimeZone(), true, false);
+            g_rowTip[i] = L"Usage spike at " + at + L":\r\n" + W(r.spikeText) + L"\r\nClick to clear.\r\n\r\n" + g_rowTip[i];
+        }
         g_rowRunning[i] = r.running;
         anyRunning |= r.running;
     }
@@ -625,6 +690,26 @@ static void paintButtonCell(HDC dc, int row, int col) {
     }
 }
 
+// Updated time + red "!" badge (usage spike). Only used for rows with a spike.
+static void paintUpdatedCell(HDC dc, int row, const Cell& cell) {
+    RECT rc = cellRect(row, colUpdated());
+    FillRect(dc, &rc, GetSysColorBrush(COLOR_WINDOW));
+    wchar_t buf[64] = L"";
+    ListView_GetItemText(g_list, row, colUpdated(), buf, 64);
+    RECT tr = rc;
+    tr.left += dpiScale(6);
+    HGDIOBJ old = SelectObject(dc, g_font);
+    SetBkMode(dc, TRANSPARENT);
+    SetTextColor(dc, textColor(cell.color));
+    DrawTextW(dc, buf, -1, &tr, DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
+    RECT b = badgeRect(row);
+    drawPie(dc, b.left, b.top, b.right - b.left, 100, RGB(0xD9, 0x3B, 0x3B), GetSysColor(COLOR_WINDOW));
+    SelectObject(dc, g_boldFont);
+    SetTextColor(dc, RGB(255, 255, 255));
+    DrawTextW(dc, L"!", 1, &b, DT_SINGLELINE | DT_VCENTER | DT_CENTER | DT_NOPREFIX);
+    SelectObject(dc, old);
+}
+
 // pt in list client coords. Returns the row and sets col (a button column), or -1 = no button there.
 static int buttonAt(POINT pt, int& col) {
     LVHITTESTINFO ht{};
@@ -663,6 +748,10 @@ static LRESULT customDraw(NMLVCUSTOMDRAW* cd) {
             if (col == 0) { paintNameCell(cd->nmcd.hdc, row); return CDRF_SKIPDEFAULT; }
             if (isButtonCol(col)) { paintButtonCell(cd->nmcd.hdc, row, col); return CDRF_SKIPDEFAULT; }
             if (isIndCol(col) && cell.pie >= 0) { paintIndicatorCell(cd->nmcd.hdc, row, col, cell); return CDRF_SKIPDEFAULT; }
+            if (col == colUpdated() && row < (int)g_rowSpike.size() && g_rowSpike[row]) {
+                paintUpdatedCell(cd->nmcd.hdc, row, cell);
+                return CDRF_SKIPDEFAULT;
+            }
             cd->clrText = textColor(cell.color);
             cd->clrTextBk = GetSysColor(COLOR_WINDOW);
             return CDRF_DODEFAULT;
@@ -698,6 +787,13 @@ static LRESULT CALLBACK ListSubclass(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, 
         if (row >= 0) {  // do not start a selection
             if (col == colReport()) openReport(row);
             else requestRefresh(row);
+            return 0;
+        }
+        LVHITTESTINFO ht{};  // click on an Updated cell with the "!" badge = spike seen
+        ht.pt = pt;
+        if (ListView_SubItemHitTest(g_list, &ht) >= 0 && ht.iSubItem == colUpdated() &&
+            ht.iItem < (int)g_rowSpike.size() && g_rowSpike[ht.iItem]) {
+            clearSpike(ht.iItem);
             return 0;
         }
     } else if (msg == WM_LBUTTONDBLCLK) {
@@ -781,6 +877,7 @@ static LRESULT CALLBACK TableProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             for (HICON h : g_rowIcons) if (h) DestroyIcon(h);
             g_rowIcons.clear();
             if (g_font) { DeleteObject(g_font); g_font = nullptr; }
+            if (g_boldFont) { DeleteObject(g_boldFont); g_boldFont = nullptr; }
             trimMemory();
             return 0;
     }
@@ -845,6 +942,9 @@ static LRESULT CALLBACK MainProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_APP_RELOAD:
             updateTip();
             fillTable(true);
+            return 0;
+        case WM_APP_SPIKE:
+            playSpikeSound();
             return 0;
         case WM_POWERBROADCAST:
             if (wp == PBT_APMRESUMEAUTOMATIC) SetTimer(hwnd, TIMER_RESUME, 30000, nullptr);  // wait for the network

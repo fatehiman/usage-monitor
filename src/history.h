@@ -12,9 +12,10 @@
 struct AppSettings {
     int historyDays = 30;  // history_days = 30    keep / read this many days of logs
     int weekStart = 6;     // week_start = sat     first day of the week in the report (0 = Sun .. 6 = Sat)
+    std::string spikeSound;  // spike_sound = C:\x.wav   sound of a usage spike (empty = Windows "Exclamation")
 };
 
-// Reads usage-monitor.ini [app]: timezone (sets the app display zone), history_days, week_start.
+// Reads usage-monitor.ini [app]: timezone (sets the app display zone), history_days, week_start, spike_sound.
 void loadAppSettings();
 const AppSettings& appSettings();
 std::wstring iniPath();

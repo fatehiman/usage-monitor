@@ -33,9 +33,20 @@ Read `project-description.md` first. It says *what* the app does. This file says
   `openrouter-management`). Left = `total_credits − total_usage`: a `value`
   indicator can now take `total` + `used` instead of `value`.
 - **Row order + no "left" (2026-11-14):** every service has `order`
-  (Claude 10, Soniox 20, DeepSeek 30, OpenRouter 40, MihanSMS 50, MsgWay 60).
+  (Claude 10, Soniox 20, ElevenLabs 25, DeepSeek 30, OpenRouter 40, MihanSMS 50, MsgWay 60).
   Money indicators have no `label = left` (the column is already "Remained").
   The table draws very light gray grid lines (`paintGrid` in main.cpp).
+- **ElevenLabs (2026-11-14):** `services/elevenlabs.conf`, API key in Credential
+  Manager (`UsageMonitor/ElevenLabs`, from Bitwarden `Elevenlabs`). Credits left
+  (`character_limit − character_count`, pie with `max`) + days left until the plan
+  renews / ends (new indicator type `days`, see 4.5).
+- **Usage spike alarm (2026-11-14):** `spike_used` + `spike_minutes` on an indicator
+  (see 4.5b). Set for Claude (5h, week), Soniox, ElevenLabs, DeepSeek, OpenRouter.
+  Code: `src/spike.cpp`.
+- **Service icons (2026-11-14):** real logos from the site favicons
+  (`https://www.google.com/s2/favicons?domain=<site>&sz=256` -> `tools/logo_to_ico.py`).
+  MihanSMS keeps a green dot: its home page is empty and it has no favicon.
+- **Auto start (2026-11-14):** DelayedTaskRunner line `00:04:00,E:\www\usage-monitor\build\usage-monitor.exe`.
 - **Usage history + report (2026-11-14):** daily log files `history\*.tsv`,
   auto-deleted after 30 days; per-row report button (purple, column-chart icon)
   starts `usage-monitor.exe --report <file>` in a separate process, which
@@ -127,6 +138,7 @@ usage-monitor/
     tz.cpp/.h           time zones (IANA via icu.dll), short time text
     draw.cpp/.h         anti-aliased pie, refresh and report buttons
     history.cpp/.h      [app] settings, daily history logs, cleanup
+    spike.cpp/.h        usage spike alarm (readings in memory, worker thread only)
     report.cpp/.h       --report: reads history, fills res/report.html, opens browser
     util.cpp/.h         UTF-8/16, strings, files, log
   res/
@@ -138,8 +150,10 @@ usage-monitor/
     claude.conf / .ico
     soniox.conf / .ico
     deepseek.conf / .ico
+    elevenlabs.conf / .ico  (and openrouter, msgway, mihansms)
   tools/
-    make_icons.py       makes app.ico and the service icons (no libraries)
+    make_icons.py       makes app.ico and mihansms.ico (a dot: that site has no logo; no libraries)
+    logo_to_ico.py      real service logo (site favicon PNG) -> .ico 16-48 px (Pillow)
     set-secret.ps1      saves a secret in Windows Credential Manager (hidden input or -FromEnv)
     uitest.ps1          opens the table, screenshot, centering and memory check
   build.ps1             build, -Run
@@ -303,6 +317,7 @@ if (GetLastError() == ERROR_ALREADY_EXISTS) {
 timezone=Asia/Tehran     ; display zone for ALL times (reset times, Updated, report); read at startup
 history_days=30          ; keep (and read in the report) this many days of history logs; default 30
 week_start=sat           ; first day of the week in the report: sun..sat; default sat
+spike_sound=             ; .wav file for a usage spike; empty = the Windows "Exclamation" sound
 [window]                 ; written by the app: last window position
 left=... top=... right=... bottom=... maximized=0
 ```
@@ -375,7 +390,8 @@ for percent; `used` + `total` for ratio).
 | Key | Used by | Meaning |
 |---|---|---|
 | `label` | all | Short text **after** the value: cell = `<value> <label> (<reset>)`, e.g. `64% Fable (Tue 4:00)`. |
-| `type` | all | `ratio`, `value`, or `percent`. |
+| `type` | all | `ratio`, `value`, `percent`, or `days`. |
+| `date` | days | A time (ISO 8601 or epoch) when the plan ends / renews. Shows `23 days (12/7 4:05)`, `5 h` on the last day, `expired` after it. Colors (`warn_below` …) compare the days left. Not written to the history log. |
 | `remain` / `used` | ratio | Give one. If `used` is given: remain = total − used. |
 | `total` | ratio | Total amount. |
 | `value` | value | The number. Or give `total` + `used`: value = total − used. |
@@ -391,11 +407,30 @@ for percent; `used` + `total` for ratio).
 | `warn_above` / `alert_above` | all | Same, for "high is bad". |
 | `reset` | all | A time (ISO 8601 or epoch). Shown as `(resets 19:30)` or `(resets Fri 19:30)`. |
 | `tray` | all | `1` = include in the tray tooltip. |
-| `max` | value | Maximum for the pie (pie = value / max). Without it, a `value` has no pie. |
+| `max` | value, days | Maximum for the pie (pie = value / max; for `days`: the plan length in days). Without it there is no pie. |
+| `spike_used` / `spike_minutes` | all | Usage spike alarm, see 4.5b. |
 | `pie` | all | `0` = no pie for this indicator. |
 | `optional` | all | `1` = skip the indicator when its value is empty (e.g. a limit the plan does not have). |
 
 `label` may use variables, e.g. `label = {{model_name}} week`.
+
+### 4.5b Usage spike alarm
+
+```ini
+spike_used = 5        ; the shown number went DOWN by 5 or more (5 %, $5, 5 IRT, 5 credits ...)
+spike_minutes = 1     ; ... within at least 1 minute (default 1)
+```
+
+- After each successful run the worker compares the new number with the newest
+  reading that is **at least** `spike_minutes` old. So when the check interval is
+  longer than `spike_minutes` (e.g. 30 min), the drop over that longer time is
+  used. Readings are kept in memory only: the first run after start is a baseline.
+- On a spike: one sound (`[app] spike_sound` .wav, else the Windows "Exclamation"
+  sound), and a red **!** badge next to the Updated time of that row. The tooltip
+  says what dropped (`5h: 80% -> 72% in 2 min`). The badge stays until the user
+  clicks the Updated cell. The tray tooltip line starts with `(!)` meanwhile.
+- After a spike the readings start again from the new number, so one big drop
+  rings only once.
 
 Number parsing (from HTML text): take the first number, accept Persian and
 Arabic-Indic digits (`۰–۹`, `٠–٩`), Persian decimal/thousand separators, and

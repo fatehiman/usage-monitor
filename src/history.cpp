@@ -30,6 +30,10 @@ void loadAppSettings() {
     static const char* days[] = {"sun", "mon", "tue", "wed", "thu", "fri", "sat"};
     for (int i = 0; i < 7; i++)
         if (ws == days[i]) g_app.weekStart = i;
+
+    wchar_t snd[MAX_PATH] = L"";
+    GetPrivateProfileStringW(L"app", L"spike_sound", L"", snd, MAX_PATH, ini.c_str());
+    g_app.spikeSound = expandEnv(trim(U(snd)));
 }
 
 std::string historyDir() { return exeDir() + "\\history"; }
@@ -69,11 +73,13 @@ void historyAppend(const std::string& file, const std::vector<IndVal>& inds, tim
     CreateDirectoryW(W(dir).c_str(), nullptr);
     std::string text;
     for (auto& v : inds) {
+        if (!v.history) continue;
         char num[40];
         snprintf(num, sizeof num, "%.10g", v.num);
         text += std::to_string((long long)when) + "\t" + clean(file) + "\t" + clean(v.id) + "\t" + num + "\t" +
                 clean(v.pre) + "\t" + clean(v.post) + "\t" + clean(v.label) + "\n";
     }
+    if (text.empty()) return;
     std::wstring path = W(dir + "\\" + dayName(displayDay(when)) + ".tsv");
     HANDLE h = CreateFileW(path.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS,
                            FILE_ATTRIBUTE_NORMAL, nullptr);

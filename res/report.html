@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Usage Report</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f4f2; --surface: #fcfcfb; --border: #e3e2de;
+  --text: #0b0b0b; --text2: #52514e; --muted: #8a8984; --grid: #ecebe7;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --tab-bg: #efeafa; --tab-border: #dcd2f1; --tab-text: #6c52a8;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121211; --surface: #1a1a19; --border: #2e2e2c;
+    --text: #f0efec; --text2: #c3c2b7; --muted: #8f8e88; --grid: #2a2a28;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --tab-bg: #2c2540; --tab-border: #40375e; --tab-text: #bfaee8;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121211; --surface: #1a1a19; --border: #2e2e2c;
+  --text: #f0efec; --text2: #c3c2b7; --muted: #8f8e88; --grid: #2a2a28;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --tab-bg: #2c2540; --tab-border: #40375e; --tab-text: #bfaee8;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+main { max-width: 1000px; margin: 0 auto; padding: 20px 16px 40px; }
+h1 { font-size: 22px; margin: 0 0 2px; }
+.sub { color: var(--muted); font-size: 12px; margin-bottom: 18px; }
+section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px 16px; margin-bottom: 16px; }
+h2 { font-size: 16px; margin: 0 0 4px; }
+h3 { font-size: 13px; font-weight: 600; color: var(--text2); margin: 14px 0 4px; }
+.range { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 6px 0 4px; }
+.stat .k { color: var(--text2); font-size: 12px; }
+.stat .v { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--text2); margin: 2px 0 2px; }
+.legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.chart text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 8px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.12); white-space: nowrap; display: none; z-index: 2; }
+.tip b { display: block; font-weight: 600; margin-bottom: 2px; }
+.tip i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.empty { color: var(--muted); font-size: 13px; padding: 18px 0; }
+.days { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
+.days button { font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+  background: transparent; color: var(--text2); border: 1px solid var(--border); }
+.days button.on { background: var(--tab-bg); border-color: var(--tab-border); color: var(--tab-text); font-weight: 600; }
+.days button:disabled { opacity: .45; cursor: default; }
+details { margin-top: 10px; font-size: 12px; color: var(--text2); }
+summary { cursor: pointer; }
+table { border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
+th, td { padding: 3px 12px 3px 0; text-align: right; border-bottom: 1px solid var(--grid); }
+th:first-child, td:first-child { text-align: left; }
+.bar { cursor: pointer; }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+const D = /*DATA*/null;
+const DAY = 86400, GAP = 2 * 3600;  // a gap over 2 h between points breaks the line (PC was off)
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const NS = 'http://www.w3.org/2000/svg';
+
+// All times are "local epochs": seconds where the UTC clock shows the display-zone wall time.
+const dt = t => new Date(t * 1000);
+const hm = t => { const d = dt(t); return d.getUTCHours() + ':' + String(d.getUTCMinutes()).padStart(2, '0'); };
+const md = t => { const d = dt(t); return (d.getUTCMonth() + 1) + '/' + d.getUTCDate(); };
+const dayLabel = t => WD[dt(t).getUTCDay()] + ' ' + md(t);
+
+const today0 = Math.floor(D.now / DAY) * DAY;
+const week0 = today0 - ((dt(today0).getUTCDay() - D.weekStart + 7) % 7) * DAY;
+const nd = dt(today0);
+const month0 = Date.UTC(nd.getUTCFullYear(), nd.getUTCMonth(), 1) / 1000;
+const month1 = Date.UTC(nd.getUTCFullYear(), nd.getUTCMonth() + 1, 1) / 1000;
+
+function fmt(v, s) {
+  if (v == null || isNaN(v)) return '-';
+  if (s.post === 'B') {
+    const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0, x = Math.abs(v);
+    while (x >= 1024 && i < 4) { x /= 1024; i++; }
+    return (v < 0 ? '-' : '') + (+x.toFixed(1)) + ' ' + u[i];
+  }
+  if (s.post === '%') return (+v.toFixed(1)) + '%';
+  const dec = s.pre.includes('$') || s.post.includes('$') ? 2 : Math.abs(v) >= 100 ? 0 : 2;
+  return s.pre + v.toFixed(dec) + s.post;
+}
+
+// Axis label: enough decimals that two ticks never show the same text.
+function axisFmt(v, s, step) {
+  if (s.post === 'B') return fmt(v, s);
+  const dec = Math.max(s.post === '%' ? 0 : s.pre.includes('$') ? 2 : 0, Math.ceil(-Math.log10(step) - 1e-9));
+  return s.pre + (+v.toFixed(10)).toFixed(Math.min(dec, 6)) + s.post;
+}
+
+// Series grouped by unit: one chart per unit (never two y-scales in one chart).
+// One series only (a balance): call it by the service name, its label is often just "left".
+D.series.forEach((s, i) => { s.color = 'var(--s' + (i % 8 + 1) + ')'; s.name = D.series.length > 1 ? s.label || s.id : D.name; });
+const groups = [];
+for (const s of D.series) {
+  const key = s.pre + '|' + s.post;
+  let g = groups.find(g => g.key === key);
+  if (!g) groups.push(g = { key, series: [] });
+  g.series.push(s);
+}
+
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function sv(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+// Index of the last point with t <= x (or -1).
+function lastAt(pts, x) {
+  let lo = 0, hi = pts.length - 1, r = -1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (pts[m][0] <= x) { r = m; lo = m + 1; } else hi = m - 1; }
+  return r;
+}
+
+// Sum of drops of the remaining value inside [d0, d0 + DAY): that is what was used.
+// Rises (reset, top-up) are not counted.
+function usedIn(s, d0, d1) {
+  let used = 0, any = false;
+  const p = s.pts;
+  for (let i = 1; i < p.length; i++) {
+    if (p[i][0] < d0 || p[i][0] >= d1) continue;
+    any = true;
+    if (p[i - 1][1] > p[i][1]) used += p[i - 1][1] - p[i][1];
+  }
+  return any ? used : null;
+}
+
+function niceStep(span, n) {
+  const raw = span / n, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p;
+  return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
+}
+
+function yScale(g, vals, zero) {
+  if (g.series[0].post === '%') return { lo: 0, hi: 100, step: 25 };
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (zero) lo = Math.min(0, lo);
+  if (!isFinite(lo)) { lo = 0; hi = 1; }
+  if (hi === lo) { hi += Math.abs(hi) * 0.1 || 1; if (!zero) lo -= Math.abs(lo) * 0.1 || 1; }
+  const step = niceStep(hi - lo, 4);
+  lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+  if (!zero && g.series[0].post !== '%' && lo < 0 && Math.min(...vals) >= 0) lo = 0;
+  return { lo, hi, step };
+}
+
+function legend(g, box) {
+  if (g.series.length < 2) return;
+  const l = el('div', 'legend');
+  for (const s of g.series) {
+    const it = el('span'); const sw = el('i'); sw.style.background = s.color;
+    it.append(sw, s.name); l.append(it);
+  }
+  box.append(l);
+}
+
+// Draws when the box has a width, and again on resize.
+const drawers = [];
+// The box is added to the page right after this returns, so draw a moment later (then it has a width).
+function mount(box, draw) { drawers.push([box, draw]); queueMicrotask(() => draw(box)); }
+let rz;
+addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => drawers.forEach(([b, d]) => { if (b.isConnected) d(b); }), 120); });
+
+const M = { l: 52, r: 14, t: 10, b: 24 };
+
+// Line chart of the remaining value over [t0, t1). ticks: [{t, label}].
+function lineChart(g, t0, t1, ticks, h) {
+  const box = el('div', 'chart');
+  mount(box, () => {
+    box.innerHTML = '';
+    const W = Math.max(300, box.clientWidth || 600), H = h || 200;
+    const vis = g.series.map(s => s.pts.filter(p => p[0] >= t0 - GAP && p[0] < t1));
+    const vals = vis.flat().map(p => p[1]);
+    if (!vals.length) { box.append(el('div', 'empty', 'No data for this period.')); return; }
+    const y = yScale(g, vals, false);
+    const X = t => M.l + (t - t0) / (t1 - t0) * (W - M.l - M.r);
+    const Y = v => M.t + (1 - (v - y.lo) / (y.hi - y.lo)) * (H - M.t - M.b);
+    const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img' }, box);
+    for (let v = y.lo; v <= y.hi + y.step / 1e6; v += y.step) {
+      sv('line', { x1: M.l, x2: W - M.r, y1: Y(v), y2: Y(v), style: 'stroke:var(--grid)' }, svg);
+      sv('text', { x: M.l - 6, y: Y(v) + 4, 'text-anchor': 'end' }, svg).textContent = axisFmt(v, g.series[0], y.step);
+    }
+    const every = Math.ceil(ticks.length / Math.max(2, Math.floor((W - M.l - M.r) / 64)));
+    ticks.forEach((k, i) => {
+      if (i % every) return;
+      sv('line', { x1: X(k.t), x2: X(k.t), y1: M.t, y2: H - M.b, style: 'stroke:var(--grid)' }, svg);
+      sv('text', { x: X(k.t) + 3, y: H - 7 }, svg).textContent = k.label;
+    });
+    const now = D.now;
+    if (now >= t0 && now < t1)
+      sv('line', { x1: X(now), x2: X(now), y1: M.t, y2: H - M.b, style: 'stroke:var(--muted);stroke-dasharray:3 3' }, svg);
+    g.series.forEach((s, i) => {
+      let d = '', prev = null;
+      for (const p of vis[i]) {
+        const tx = Math.max(t0, p[0]);
+        d += (prev && p[0] - prev[0] <= GAP ? 'L' : 'M') + X(tx).toFixed(1) + ' ' + Y(p[1]).toFixed(1);
+        prev = p;
+      }
+      sv('path', { d, style: `fill:none;stroke:${s.color};stroke-width:2;stroke-linejoin:round;stroke-linecap:round` }, svg);
+    });
+    // Hover: crosshair + values at that time.
+    const cross = sv('line', { y1: M.t, y2: H - M.b, style: 'stroke:var(--text2);display:none' }, svg);
+    const dots = g.series.map(s => sv('circle', { r: 4, style: `fill:${s.color};stroke:var(--surface);stroke-width:2;display:none` }, svg));
+    const tip = el('div', 'tip'); box.append(tip);
+    const hit = sv('rect', { x: M.l, y: M.t, width: W - M.l - M.r, height: H - M.t - M.b, style: 'fill:transparent' }, svg);
+    hit.addEventListener('pointermove', e => {
+      const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * W / r.width;
+      const t = t0 + (px - M.l) / (W - M.l - M.r) * (t1 - t0);
+      let html = '', best = null;
+      g.series.forEach((s, i) => {
+        const k = lastAt(vis[i], t), p = k >= 0 ? vis[i][k] : null;
+        if (p && t - p[0] <= GAP) {
+          dots[i].setAttribute('cx', X(Math.max(t0, p[0]))); dots[i].setAttribute('cy', Y(p[1])); dots[i].style.display = '';
+          html += `<div><i style="background:${s.color}"></i>${esc(s.name)}: ${fmt(p[1], s)}</div>`;
+          if (!best || p[0] > best) best = p[0];
+        } else dots[i].style.display = 'none';
+      });
+      if (!html) { tip.style.display = 'none'; cross.style.display = 'none'; return; }
+      cross.setAttribute('x1', X(Math.max(t0, best))); cross.setAttribute('x2', X(Math.max(t0, best))); cross.style.display = '';
+      tip.innerHTML = `<b>${t1 - t0 > DAY ? dayLabel(best) + ' ' : ''}${hm(best)}</b>` + html;
+      tip.style.display = 'block';
+      const bx = X(Math.max(t0, best)) * r.width / W, tw = tip.offsetWidth;
+      tip.style.left = (bx + 12 + tw > r.width ? bx - 12 - tw : bx + 12) + 'px';
+      tip.style.top = '8px';
+    });
+    hit.addEventListener('pointerleave', () => { tip.style.display = 'none'; cross.style.display = 'none'; dots.forEach(d => d.style.display = 'none'); });
+  });
+  return box;
+}
+
+// Bars: amount used per day (grouped by series). days: start epochs.
+function barChart(g, days, label, onPick) {
+  const box = el('div', 'chart');
+  mount(box, () => {
+    box.innerHTML = '';
+    const W = Math.max(300, box.clientWidth || 600), H = 150;
+    const used = g.series.map(s => days.map(d => usedIn(s, d, d + DAY)));
+    const vals = used.flat().filter(v => v != null);
+    if (!vals.length) { box.append(el('div', 'empty', 'No data for this period.')); return; }
+    const y = g.series[0].post === '%' ? (() => { const hi = Math.max(10, ...vals), st = niceStep(hi, 4); return { lo: 0, hi: Math.ceil(hi / st) * st, step: st }; })()
+                                       : yScale(g, vals.concat([0]), true);
+    const Y = v => M.t + (1 - (v - y.lo) / (y.hi - y.lo)) * (H - M.t - M.b);
+    const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img' }, box);
+    for (let v = y.lo; v <= y.hi + y.step / 1e6; v += y.step) {
+      sv('line', { x1: M.l, x2: W - M.r, y1: Y(v), y2: Y(v), style: 'stroke:var(--grid)' }, svg);
+      sv('text', { x: M.l - 6, y: Y(v) + 4, 'text-anchor': 'end' }, svg).textContent = axisFmt(v, g.series[0], y.step);
+    }
+    const slot = (W - M.l - M.r) / days.length, n = g.series.length;
+    const bw = Math.max(2, Math.min(28, (slot - 6) / n - 2));
+    const tip = el('div', 'tip'); box.append(tip);
+    const every = Math.ceil(days.length / Math.max(2, Math.floor((W - M.l - M.r) / 44)));
+    days.forEach((d, j) => {
+      const cx = M.l + slot * (j + 0.5);
+      if (j % every === 0) sv('text', { x: cx, y: H - 7, 'text-anchor': 'middle', style: d === today0 ? 'fill:var(--text);font-weight:600' : '' }, svg).textContent = label(d);
+      const x0 = cx - (n * (bw + 2) - 2) / 2;
+      g.series.forEach((s, i) => {
+        const v = used[i][j];
+        if (v == null || v <= 0) return;
+        const top = Y(v), base = Y(0), hgt = Math.max(1, base - top), r = Math.min(4, bw / 2, hgt);
+        const x = x0 + i * (bw + 2);
+        sv('path', { d: `M${x} ${base}V${top + r}q0 -${r} ${r} -${r}h${bw - 2 * r}q${r} 0 ${r} ${r}V${base}Z`, style: `fill:${s.color}`, class: onPick ? 'bar' : '' }, svg);
+      });
+      // Hit area for the whole day column (bigger than the bars).
+      const hit = sv('rect', { x: M.l + slot * j, y: M.t, width: slot, height: H - M.t - M.b, style: 'fill:transparent', class: onPick ? 'bar' : '' }, svg);
+      hit.addEventListener('pointermove', e => {
+        const r = svg.getBoundingClientRect();
+        tip.innerHTML = `<b>${dayLabel(d)} - used</b>` + g.series.map((s, i) =>
+          `<div><i style="background:${s.color}"></i>${esc(s.name)}: ${used[i][j] == null ? 'no data' : fmt(used[i][j], s)}</div>`).join('') +
+          (onPick ? '<div style="color:var(--muted)">Click to see this day</div>' : '');
+        tip.style.display = 'block';
+        const bx = (M.l + slot * (j + 1)) * r.width / W, tw = tip.offsetWidth;
+        tip.style.left = (bx + 4 + tw > r.width ? (M.l + slot * j) * r.width / W - 4 - tw : bx + 4) + 'px';
+        tip.style.top = '8px';
+      });
+      hit.addEventListener('pointerleave', () => tip.style.display = 'none');
+      if (onPick) hit.addEventListener('click', () => onPick(d));
+    });
+  });
+  return box;
+}
+
+function usedTable(g, days) {
+  const det = el('details'); det.append(el('summary', null, 'Show as table'));
+  const tb = el('table'), hr = el('tr');
+  hr.append(el('th', null, 'Day'), ...g.series.map(s => el('th', null, s.name + ' used')), ...g.series.map(s => el('th', null, s.name + ' at end')));
+  tb.append(hr);
+  for (const d of days) {
+    if (d > today0) break;
+    const tr = el('tr');
+    tr.append(el('td', null, dayLabel(d)));
+    g.series.forEach(s => tr.append(el('td', null, fmt(usedIn(s, d, d + DAY), s))));
+    g.series.forEach(s => { const k = lastAt(s.pts, d + DAY - 1); tr.append(el('td', null, k >= 0 && s.pts[k][0] >= d ? fmt(s.pts[k][1], s) : '-')); });
+    tb.append(tr);
+  }
+  det.append(tb);
+  return det;
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
+
+const hourTicks = d0 => [0, 3, 6, 9, 12, 15, 18, 21].map(h => ({ t: d0 + h * 3600, label: h + ':00' }));
+const dayTicks = (a, b, f) => { const r = []; for (let d = a; d < b; d += DAY) r.push({ t: d, label: f(d) }); return r; };
+const range = (a, b) => { const r = []; for (let d = a; d < b; d += DAY) r.push(d); return r; };
+
+function section(title, sub) {
+  const s = el('section'); s.append(el('h2', null, title), el('div', 'range', sub));
+  app.append(s); return s;
+}
+
+// ---------------------------------------------------------------- page
+const app = document.getElementById('app');
+document.title = D.name + ' usage';
+app.append(el('h1', null, D.name + ' - usage history'));
+app.append(el('div', 'sub', 'Remaining value over time. "Used" = how much the remaining value went down (top-ups and resets are not counted). ' +
+  'Generated ' + dayLabel(D.now) + ' ' + hm(D.now) + '. Last ' + D.days + ' days are kept.'));
+
+if (!D.series.length) {
+  app.append(el('div', 'empty', 'No history yet. Values are logged after each successful update.'));
+} else {
+  // Today
+  const sT = section('Today', dayLabel(today0));
+  for (const g of groups) {
+    if (groups.length > 1) sT.append(el('h3', null, g.series.map(s => s.name).join(', ')));
+    const st = el('div', 'stats');
+    for (const s of g.series) {
+      const k = lastAt(s.pts, D.now), u = usedIn(s, today0, today0 + DAY);
+      const a = el('div', 'stat'); a.append(el('div', 'k', s.name + ' now'), el('div', 'v', k >= 0 ? fmt(s.pts[k][1], s) : '-'));
+      const b = el('div', 'stat'); b.append(el('div', 'k', s.name + ' used today'), el('div', 'v', u == null ? '-' : fmt(u, s)));
+      st.append(a, b);
+    }
+    sT.append(st);
+    legend(g, sT);
+    sT.append(lineChart(g, today0, today0 + DAY, hourTicks(today0)));
+  }
+
+  // This week
+  const wDays = range(week0, week0 + 7 * DAY);
+  const sW = section('This week', dayLabel(week0) + ' - ' + dayLabel(week0 + 6 * DAY));
+  for (const g of groups) {
+    if (groups.length > 1) sW.append(el('h3', null, g.series.map(s => s.name).join(', ')));
+    legend(g, sW);
+    sW.append(lineChart(g, week0, week0 + 7 * DAY, dayTicks(week0, week0 + 7 * DAY, d => WD[dt(d).getUTCDay()])));
+    sW.append(el('h3', null, 'Used per day'));
+    const detail = el('div');
+    const bar = el('div', 'days');
+    const pick = d => {
+      [...bar.children].forEach(b => b.classList.toggle('on', +b.dataset.d === d));
+      detail.innerHTML = '';
+      detail.append(el('h3', null, dayLabel(d) + ' - by hour'));
+      detail.append(lineChart(g, d, d + DAY, hourTicks(d), 170));
+    };
+    sW.append(barChart(g, wDays, d => WD[dt(d).getUTCDay()], pick));
+    for (const d of wDays) {
+      const b = el('button', null, dayLabel(d)); b.dataset.d = d; b.disabled = d > today0;
+      b.title = 'Show ' + dayLabel(d) + ' by hour';
+      b.addEventListener('click', () => pick(d)); bar.append(b);
+    }
+    sW.append(bar, detail);
+    pick(today0);
+    sW.append(usedTable(g, wDays));
+  }
+
+  // This month
+  const mDays = range(month0, month1);
+  const sM = section('This month', dt(month0).toLocaleString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' }));
+  for (const g of groups) {
+    if (groups.length > 1) sM.append(el('h3', null, g.series.map(s => s.name).join(', ')));
+    legend(g, sM);
+    sM.append(lineChart(g, month0, month1, dayTicks(month0, month1, d => String(dt(d).getUTCDate()))));
+    sM.append(el('h3', null, 'Used per day'));
+    sM.append(barChart(g, mDays, d => String(dt(d).getUTCDate()), null));
+    sM.append(usedTable(g, mDays));
+  }
+}
+</script>
+</body>
+</html>

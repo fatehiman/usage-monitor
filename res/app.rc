@@ -1,0 +1,31 @@
+#include <windows.h>
+
+1 ICON "app.ico"
+// Manifest under ID 2, not 1: MinGW links its own default manifest as ID 1 and
+// this ld version fails to merge two. main.cpp activates ID 2 at startup
+// (common controls v6) and sets DPI awareness with an API call.
+2 24 "app.manifest"
+// Report page template (src/report.cpp fills in the data).
+3 RCDATA "report.html"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 0,1,0,0
+PRODUCTVERSION 0,1,0,0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "FileDescription", "Usage Monitor"
+      VALUE "ProductName", "Usage Monitor"
+      VALUE "FileVersion", "0.1.0"
+      VALUE "ProductVersion", "0.1.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0409, 1200
+  END
+END

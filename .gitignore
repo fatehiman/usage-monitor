@@ -1,0 +1,9 @@
+build/
+*.exe
+*.o
+*.log
+last-values.ini
+.claude/settings.local.json
+usage-monitor.ini
+history/
+reports/

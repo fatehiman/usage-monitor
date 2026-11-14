@@ -637,10 +637,25 @@ static int buttonAt(POINT pt, int& col) {
     return ht.iItem;
 }
 
+// Very light grid: a line under each row and at the right edge of each column.
+static void paintGrid(HDC dc, int row) {
+    static HBRUSH br = CreateSolidBrush(RGB(0xE6, 0xE6, 0xE6));
+    RECT rr = cellRect(row, 0);  // whole row
+    RECT h{rr.left, rr.bottom - 1, rr.right, rr.bottom};
+    FillRect(dc, &h, br);
+    int x = rr.left;
+    for (int c = 0, n = colCount(); c < n; c++) {
+        x += ListView_GetColumnWidth(g_list, c);
+        RECT v{x - 1, rr.top, x, rr.bottom};
+        FillRect(dc, &v, br);
+    }
+}
+
 static LRESULT customDraw(NMLVCUSTOMDRAW* cd) {
     switch (cd->nmcd.dwDrawStage) {
         case CDDS_PREPAINT: return CDRF_NOTIFYITEMDRAW;
-        case CDDS_ITEMPREPAINT: return CDRF_NOTIFYSUBITEMDRAW;
+        case CDDS_ITEMPREPAINT: return CDRF_NOTIFYSUBITEMDRAW | CDRF_NOTIFYPOSTPAINT;
+        case CDDS_ITEMPOSTPAINT: paintGrid(cd->nmcd.hdc, (int)cd->nmcd.dwItemSpec); return CDRF_DODEFAULT;
         case CDDS_ITEMPREPAINT | CDDS_SUBITEM: {
             int row = (int)cd->nmcd.dwItemSpec, col = cd->iSubItem;
             if (row < 0 || row >= (int)g_cells.size() || col >= (int)g_cells[row].size()) return CDRF_DODEFAULT;

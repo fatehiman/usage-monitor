@@ -83,6 +83,13 @@ const nd = dt(today0);
 const month0 = Date.UTC(nd.getUTCFullYear(), nd.getUTCMonth(), 1) / 1000;
 const month1 = Date.UTC(nd.getUTCFullYear(), nd.getUTCMonth() + 1, 1) / 1000;
 
+// "1843870" -> "1,843,870" (only numbers >= 10000, so small ones stay short).
+function sep(t) {
+  const [i, f] = t.split('.');
+  if (i.replace('-', '').length < 5) return t;
+  return i.replace(/\B(?=(\d{3})+$)/g, ',') + (f != null ? '.' + f : '');
+}
+
 function fmt(v, s) {
   if (v == null || isNaN(v)) return '-';
   if (s.post === 'B') {
@@ -92,14 +99,14 @@ function fmt(v, s) {
   }
   if (s.post === '%') return (+v.toFixed(1)) + '%';
   const dec = s.pre.includes('$') || s.post.includes('$') ? 2 : Math.abs(v) >= 100 ? 0 : 2;
-  return s.pre + v.toFixed(dec) + s.post;
+  return s.pre + sep(v.toFixed(dec)) + s.post;
 }
 
 // Axis label: enough decimals that two ticks never show the same text.
 function axisFmt(v, s, step) {
   if (s.post === 'B') return fmt(v, s);
   const dec = Math.max(s.post === '%' ? 0 : s.pre.includes('$') ? 2 : 0, Math.ceil(-Math.log10(step) - 1e-9));
-  return s.pre + (+v.toFixed(10)).toFixed(Math.min(dec, 6)) + s.post;
+  return s.pre + sep((+v.toFixed(10)).toFixed(Math.min(dec, 6))) + s.post;
 }
 
 // Series grouped by unit: one chart per unit (never two y-scales in one chart).

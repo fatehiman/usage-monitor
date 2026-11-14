@@ -22,11 +22,25 @@ Read `project-description.md` first. It says *what* the app does. This file says
   `services/deepseek.conf` — USD balance with an API key from Credential
   Manager (copied once from Bitwarden with `tools\set-secret.ps1 -FromEnv`),
   every 30 min. `value` indicators with `prefix = $`, no pie.
+- **SMS balances (2026-11-14):** `services/msgway.conf` (REST, IRT only) and
+  `services/mihansms.conf` (SOAP `accountInfo` of the main account: IRT + SMS
+  left as a 2nd column), every 60 min. Both APIs give Rial → `factor = 0.1`.
+  The key / password is read with `{{file:...}}` from `my-own-token.txt` in
+  `E:\www\=providers\sms\<provider>\` on every run, so the owner rotates it
+  by editing that file. Tech refs are in the same folders.
+- **OpenRouter (2026-11-14):** `services/openrouter.conf`, management key in
+  Credential Manager (`UsageMonitor/OpenRouter`, from Bitwarden
+  `openrouter-management`). Left = `total_credits − total_usage`: a `value`
+  indicator can now take `total` + `used` instead of `value`.
+- **Row order + no "left" (2026-11-14):** every service has `order`
+  (Claude 10, Soniox 20, DeepSeek 30, OpenRouter 40, MihanSMS 50, MsgWay 60).
+  Money indicators have no `label = left` (the column is already "Remained").
+  The table draws very light gray grid lines (`paintGrid` in main.cpp).
 - **Usage history + report (2026-11-14):** daily log files `history\*.tsv`,
   auto-deleted after 30 days; per-row report button (purple, column-chart icon)
   starts `usage-monitor.exe --report <file>` in a separate process, which
   writes `reports\<service>.html` and opens the browser. See 4.8.
-- **Measured (3 services, 2026-11-14):** window open 4.3 MB private / 12 MB
+- **Measured (3 services, 2026-11-14; same with 5):** window open 4.3 MB private / 12 MB
   working set, back to 2.7 MB working set after close (private stays 4.3 MB).
   Earlier, with 1 service: idle 3.2 MB private / 1.7 MB working set.
 - **Not built yet:** `exec:` steps, `cookie:` extractor, `last-values.ini`,
@@ -364,12 +378,13 @@ for percent; `used` + `total` for ratio).
 | `type` | all | `ratio`, `value`, or `percent`. |
 | `remain` / `used` | ratio | Give one. If `used` is given: remain = total − used. |
 | `total` | ratio | Total amount. |
-| `value` | value | The number. |
+| `value` | value | The number. Or give `total` + `used`: value = total − used. |
 | `percent` | percent | 0–100. Or leave empty and give `remain` + `total`. |
 | `invert` | percent | `1` → show `100 − percent` (e.g. API gives "used", we show "left"). |
 | `factor` | all | Multiply input numbers (e.g. `0.01` for cents). |
 | `scale` | ratio, value | `bytes` / `kb` / `mb` / `gb` = input unit; output is auto-scaled to the best unit (`25.3 GB`). |
 | `unit` / `prefix` / `suffix` | all | Plain text, e.g. `prefix = $`, `suffix = " days"`. |
+| `thousands` | value | `1` = thousands separators: `184,387`. |
 | `decimals` | all | Digits after the point. Default: 0 for percent, 1 for bytes, 2 for value. |
 | `text` | all | `left` (default for percent with invert) etc. — free text after the value, e.g. `54% left`. |
 | `warn_below` / `alert_below` | all | Color the cell. Compared with: remaining % (ratio), shown % (percent), the number (value). |

@@ -8,7 +8,9 @@ for example:
 
 - the home FTTH internet account (data left, days left),
 - Claude usage (5-hour and weekly limits),
-- API money balances (Soniox, DeepSeek — shown in USD),
+- API money balances (Soniox, DeepSeek, OpenRouter — shown in USD),
+- SMS provider balances (MsgWay, MihanSMS — shown in IRT; MihanSMS also shows
+  the SMS left as a 2nd column),
 - a prepaid SIM or any account with a money balance.
 
 All results are shown in **one table window**: one row per service.
@@ -124,7 +126,9 @@ the stack comparison.
 Full format: see `plan.md`, section "Config file format".
 
 Services now: `claude.conf` (web session via keep-sessions), `soniox.conf` and
-`deepseek.conf` (API keys, every 30 min, no browser extension needed).
+`deepseek.conf` (API keys, every 30 min, no browser extension needed),
+`msgway.conf` and `mihansms.conf` (every 60 min; key / password read from
+`my-own-token.txt` in `E:\www\=providers\sms\<provider>\`).
 
 ## Usage history and report
 

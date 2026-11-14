@@ -1,4 +1,4 @@
-"""Makes res/app.ico (gauge) and services/claude.ico (orange dot). No extra libraries.
+"""Makes res/app.ico (gauge) and services/*.ico (one colored dot per service). No extra libraries.
 Run: python -I tools/make_icons.py  (from the project root)
 """
 import math
@@ -118,4 +118,7 @@ if __name__ == "__main__":
     (root / "services" / "claude.ico").write_bytes(ico(dot))
     (root / "services" / "deepseek.ico").write_bytes(ico(ring_dot((77, 107, 254))))  # blue
     (root / "services" / "soniox.ico").write_bytes(ico(ring_dot((32, 150, 140))))   # teal
+    (root / "services" / "msgway.ico").write_bytes(ico(ring_dot((230, 120, 30))))   # orange
+    (root / "services" / "mihansms.ico").write_bytes(ico(ring_dot((70, 160, 60))))  # green
+    (root / "services" / "openrouter.ico").write_bytes(ico(ring_dot((100, 100, 120))))  # slate
     print("icons written")

@@ -305,6 +305,16 @@ std::string fmtNum(double v, int dec, bool stripZeros) {
     return s;
 }
 
+// "1843870.5" -> "1,843,870.5"
+std::string addThousands(const std::string& s) {
+    size_t start = (!s.empty() && s[0] == '-') ? 1 : 0;
+    size_t end = s.find('.');
+    if (end == std::string::npos) end = s.size();
+    std::string out = s;
+    for (size_t i = end; i > start + 3; i -= 3) out.insert(i - 3, ",");
+    return out;
+}
+
 std::string fmtBytes(double bytes, int dec) {
     static const char* units[] = {"B", "KB", "MB", "GB", "TB", "PB"};
     int u = 0;
@@ -439,13 +449,16 @@ bool formatIndicator(Ctx& c, const Section& ind, IndVal& out) {
     } else if (type == "value") {
         int hv = num(c, ind, "value", value);
         if (hv < 0) return false;
-        if (!hv) { c.err = "indicator " + ind.id + ": value is missing or empty"; return false; }
+        if (!hv && ht && hu) { value = total - used; hv = 1; }  // e.g. credits bought - credits used
+        if (!hv) { c.err = "indicator " + ind.id + ": value (or total + used) is missing or empty"; return false; }
         if (scale > 0) {
             val = fmtBytes(value * scale, decS.empty() ? 1 : atoi(decS.c_str()));
             out.num = value * scale;
             out.post = "B";
         } else {
-            val = prefix + fmtNum(value, decS.empty() ? 2 : atoi(decS.c_str()), false) + (unit.empty() ? "" : " " + unit) + suffix;
+            std::string n = fmtNum(value, decS.empty() ? 2 : atoi(decS.c_str()), false);
+            if (ind.get("thousands") == "1") n = addThousands(n);
+            val = prefix + n + (unit.empty() ? "" : " " + unit) + suffix;
             out.num = value;
             out.pre = prefix;
             out.post = (unit.empty() ? "" : " " + unit) + suffix;

@@ -12,6 +12,7 @@ for example:
 - ElevenLabs credits left and days left until the plan renews or ends,
 - SMS provider balances (MsgWay, MihanSMS — shown in IRT; MihanSMS also shows
   the SMS left as a 2nd column),
+- the Asale wallet (USDT, read from the Asale client on deb21 in the LAN),
 - a prepaid SIM or any account with a money balance.
 
 All results are shown in **one table window**: one row per service.
@@ -64,7 +65,7 @@ the stack comparison.
 |----------------+--------------------------------------------+---------+----+----|
 | (i) Claude     | (o) 91% 5h (13:30) | (o) 8% Week (Tue 4:00) | 10:13   | [R]| [H]|
 | (i) Home FTTH  | (o) 25 GB / 500 GB Data | 12 days          | 11/13 9:05 | [R]| [H]|
-| (i) DeepSeek   | $3.89 left                                  | Error   | [R]| [H]|
+| (i) DeepSeek   | $3.89                                       | Error   | [R]| [H]|
 +---------------------------------------------------------------------------------+
   (o) = small pie of the remaining part, [R] = refresh button, [H] = usage report
 ```
@@ -76,6 +77,8 @@ the stack comparison.
   available, never what is used.** A service whose API gives "used" must convert
   it (`invert = 1` for percent, `used` + `total` for ratio). This applies to every
   future service.
+- **Rule: no words like `left` / `remaining` in the cells.** The column title
+  "Remained" already says it: `$3.89`, `23 days (12/7 4:05)`, not `$3.89 left`.
 - Short cell text: `<value> <label> (<reset time>)`, e.g. `64% Fable (Tue 4:00)`.
   Keep labels short (`5h`, `Week`, `Data`).
 - **Updated** column: time of the last successful update, green when the last
@@ -98,7 +101,7 @@ the stack comparison.
   tooltip "Usage report of <name>") opens the usage history of that service in
   the default browser (see "Usage history and report" below).
 - Money balances (Soniox, DeepSeek) are `value` indicators with `prefix = $` and
-  no `max`, so they show only the amount (`$3.89 left`), no pie and no percent.
+  no `max`, so they show only the amount (`$3.89`), no pie and no percent.
 - **Usage spike alarm:** when the number of a service goes down a lot in a short
   time (set per indicator in the `.conf`: `spike_used` + `spike_minutes`, e.g. 5 %
   in 1 min, or 45 IRT in 10 min), the app plays a sound and shows a red **!** next
@@ -115,7 +118,7 @@ the stack comparison.
 | `ratio` | remaining / total | `25 GB / 500 GB` |
 | `value` | one number (balance, days, count) | `$24.56`, `12 days` |
 | `percent` | a percent | `25%` |
-| `days` | days left until a date | `23 days left (12/7 4:05)` |
+| `days` | days left until a date | `23 days (12/7 4:05)` |
 
 ## Services are defined in `.conf` files
 

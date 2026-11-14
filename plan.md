@@ -33,13 +33,20 @@ Read `project-description.md` first. It says *what* the app does. This file says
   `openrouter-management`). Left = `total_credits − total_usage`: a `value`
   indicator can now take `total` + `used` instead of `value`.
 - **Row order + no "left" (2026-11-14):** every service has `order`
-  (Claude 10, Soniox 20, ElevenLabs 25, DeepSeek 30, OpenRouter 40, MihanSMS 50, MsgWay 60).
+  (Claude 10, Soniox 20, ElevenLabs 25, DeepSeek 30, OpenRouter 40, MihanSMS 50, MsgWay 60, Asale 70).
   Money indicators have no `label = left` (the column is already "Remained").
   The table draws very light gray grid lines (`paintGrid` in main.cpp).
 - **ElevenLabs (2026-11-14):** `services/elevenlabs.conf`, API key in Credential
   Manager (`UsageMonitor/ElevenLabs`, from Bitwarden `Elevenlabs`). Credits left
   (`character_limit − character_count`, pie with `max`) + days left until the plan
-  renews / ends (new indicator type `days`, see 4.5).
+  renews / ends (new indicator type `days`, see 4.5). No `label = left` on the days
+  either (removed 2026-11-14): the cell is `22 days (12/7 4:05)`.
+- **Asale (2026-11-14):** `services/asale.conf`, USDT wallet of the Asale client on
+  deb21 (`E:\www\myLan\deb21.md`): `POST http://192.168.1.21:9700/rpc/wallet_overview`
+  with header `X-Asale-Token` = `/root/.asale/daemon.token`, copied once to Credential
+  Manager (`UsageMonitor/Asale`). `balance` is micro USDT → `factor = 0.000001`,
+  shown `3.93 USDT`. Last row (`order = 70`). Port 9700 is open only while Asale is
+  enabled on deb21 (`asale.sh` option 1); when it is off, the row shows an error.
 - **Usage spike alarm (2026-11-14):** `spike_used` + `spike_minutes` on an indicator
   (see 4.5b). Set for Claude (5h, week), Soniox, ElevenLabs, DeepSeek, OpenRouter.
   Code: `src/spike.cpp`.
@@ -385,7 +392,8 @@ Store a secret once, not in the `.conf` file:
 
 **Rule (all services): an indicator shows what is LEFT / available** — the
 column title is "Remained". If the API gives "used", convert it (`invert = 1`
-for percent; `used` + `total` for ratio).
+for percent; `used` + `total` for ratio). **Never write `left` / `remaining`
+in a cell** (`label`, `text`, `suffix`): the column title already says it.
 
 | Key | Used by | Meaning |
 |---|---|---|
@@ -402,7 +410,7 @@ for percent; `used` + `total` for ratio).
 | `unit` / `prefix` / `suffix` | all | Plain text, e.g. `prefix = $`, `suffix = " days"`. |
 | `thousands` | value | `1` = thousands separators: `184,387`. |
 | `decimals` | all | Digits after the point. Default: 0 for percent, 1 for bytes, 2 for value. |
-| `text` | all | `left` (default for percent with invert) etc. — free text after the value, e.g. `54% left`. |
+| `text` | all | Free text after the value. Not `left` (see the rule above). |
 | `warn_below` / `alert_below` | all | Color the cell. Compared with: remaining % (ratio), shown % (percent), the number (value). |
 | `warn_above` / `alert_above` | all | Same, for "high is bad". |
 | `reset` | all | A time (ISO 8601 or epoch). Shown as `(resets 19:30)` or `(resets Fri 19:30)`. |
@@ -524,9 +532,9 @@ alert_below = 5
 tray = 1
 
 [indicator.days]
-label = Days left
 type = value
 value = {{days}}
+suffix = " days"
 decimals = 0
 ```
 
@@ -588,7 +596,6 @@ header.Authorization = Bearer {{cred:UsageMonitor/DeepSeek}}
 get.balance = json:balance_infos[currency=USD].total_balance
 
 [indicator.balance]
-label = left
 type = value
 value = {{balance}}
 prefix = $

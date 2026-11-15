@@ -20,7 +20,7 @@
 #define WM_APP_RELOAD (WM_APP + 3)  // the service list changed
 #define WM_APP_SPIKE  (WM_APP + 4)  // a usage spike was found: play the sound
 
-enum { ID_OPEN = 101, ID_SETTINGS, ID_EXIT };
+enum { ID_OPEN = 101, ID_SETTINGS, ID_TOPMOST, ID_EXIT };
 enum { TIMER_RESUME = 1, TIMER_SPIN = 2 };
 static const wchar_t* kMainClass = L"UsageMonitorMain";
 static const wchar_t* kTableClass = L"UsageMonitorTable";
@@ -30,6 +30,7 @@ static const DWORD kTableStyle = WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX;
 
 static HINSTANCE g_inst;
 static HWND g_main, g_table, g_list, g_tip;
+static bool g_topmost = false;  // tray menu "Always on top", saved in usage-monitor.ini [window] topmost
 static UINT g_msgTaskbarCreated;
 static NOTIFYICONDATAW g_nid;
 static std::string g_dir;  // services folder
@@ -295,6 +296,7 @@ static void showTrayMenu(int x, int y) {
     HMENU m = CreatePopupMenu();
     AppendMenuW(m, MF_STRING, ID_OPEN, L"Open");
     AppendMenuW(m, MF_STRING, ID_SETTINGS, L"Settings");
+    AppendMenuW(m, MF_STRING | (g_topmost ? MF_CHECKED : MF_UNCHECKED), ID_TOPMOST, L"Always on top");
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(m, MF_STRING, ID_EXIT, L"Exit");
     SetMenuDefaultItem(m, ID_OPEN, FALSE);
@@ -538,6 +540,7 @@ static RECT g_posRect{};
 
 static void loadWindowPos() {
     std::wstring ini = iniPath();
+    g_topmost = GetPrivateProfileIntW(L"window", L"topmost", 0, ini.c_str()) != 0;
     int v[4];
     const wchar_t* keys[] = {L"left", L"top", L"right", L"bottom"};
     for (int i = 0; i < 4; i++) {
@@ -562,6 +565,15 @@ static void saveWindowPos() {
     LONG v[4] = {g_posRect.left, g_posRect.top, g_posRect.right, g_posRect.bottom};
     for (int i = 0; i < 4; i++) WritePrivateProfileStringW(L"window", keys[i], std::to_wstring(v[i]).c_str(), ini.c_str());
     WritePrivateProfileStringW(L"window", L"maximized", g_posMax ? L"1" : L"0", ini.c_str());
+}
+
+// Tray menu "Always on top": only a window flag, no extra memory.
+static void toggleTopmost() {
+    g_topmost = !g_topmost;
+    WritePrivateProfileStringW(L"window", L"topmost", g_topmost ? L"1" : L"0", iniPath().c_str());
+    if (g_table)
+        SetWindowPos(g_table, g_topmost ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
 // Work area of the remembered monitor; false when there is no saved position or
@@ -893,7 +905,7 @@ static void openTable() {
     RECT wa;  // create on the right monitor, so the DPI is right
     if (!savedWorkArea(wa)) wa = workAreaUnderCursor();
     // Owned by the hidden main window: an owned window gets no taskbar button.
-    CreateWindowExW(0, kTableClass, kTitle, kTableStyle, wa.left, wa.top, 600, 300, g_main, nullptr, g_inst, nullptr);
+    CreateWindowExW(g_topmost ? WS_EX_TOPMOST : 0, kTableClass, kTitle, kTableStyle, wa.left, wa.top, 600, 300, g_main, nullptr, g_inst, nullptr);
     if (!g_table) return;
     sizeAndPlace();
     ShowWindow(g_table, g_posMax && savedWorkArea(wa) ? SW_SHOWMAXIMIZED : SW_SHOW);
@@ -932,6 +944,7 @@ static LRESULT CALLBACK MainProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             switch (LOWORD(wp)) {
                 case ID_OPEN: openTable(); break;
                 case ID_SETTINGS: openServicesFolder(); break;
+                case ID_TOPMOST: toggleTopmost(); break;
                 case ID_EXIT: doExit(); break;
             }
             return 0;

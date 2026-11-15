@@ -7,7 +7,8 @@ APIs on a timer and shows how much quota or balance is left on many services,
 for example:
 
 - the home FTTH internet account (data left, days left),
-- Claude usage (5-hour and weekly limits),
+- Claude usage (5-hour and weekly limits) and days until the subscription
+  renews or ends,
 - API money balances (Soniox, DeepSeek, OpenRouter — shown in USD),
 - ElevenLabs credits left and days left until the plan renews or ends,
 - SMS provider balances (MsgWay, MihanSMS — shown in IRT; MihanSMS also shows
@@ -40,11 +41,14 @@ the stack comparison.
 
 - **Left-click** = toggle: opens the table window; when the window is already
   open, closes it to the tray (a minimized window is restored instead).
-- **Right-click** = a menu with only 3 items:
+- **Right-click** = a menu with only 4 items:
   1. **Open** (default item, shown in bold)
   2. **Settings** — opens the folder with the `.conf` files in Explorer
-  3. *(separator)*
-  4. **Exit**
+  3. **Always on top** — on/off (check mark). The table window stays above other
+     windows. Saved in `usage-monitor.ini` (`[window] topmost`). It is only a
+     window flag, so it costs no memory.
+  4. *(separator)*
+  5. **Exit**
 - Tooltip on hover: a short summary (only indicators marked `tray = 1`).
 
 ### Tray app behavior (answers to the desktop-app-rules questions)
@@ -106,7 +110,8 @@ the stack comparison.
   time (set per indicator in the `.conf`: `spike_used` + `spike_minutes`, e.g. 5 %
   in 1 min, or 45 IRT in 10 min), the app plays a sound and shows a red **!** next
   to the Updated time. The tooltip says what happened; a click on the cell clears it.
-- **Days left:** a service with a plan that ends (e.g. ElevenLabs) can show the days
+- **Days left:** a service with a plan that ends (e.g. ElevenLabs, the Claude
+  subscription) can show the days
   left (indicator type `days`), orange / red when few days are left.
 - Small extras: `F5` = refresh all, `Esc` = close, double-click a row = open the
   service website (if `site` is set). Rows can not be selected (read-only table).

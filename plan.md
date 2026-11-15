@@ -3,7 +3,7 @@
 Read `project-description.md` first. It says *what* the app does. This file says
 *how* to build it.
 
-## Status (2026-11-14)
+## Status (2026-11-15)
 
 - **Done (phases 0–4, most of 5):** tray app, table window, `.conf` parser,
   folder watch, worker thread, WinHTTP, steps (`http(s):`, `file:`), extractors
@@ -12,6 +12,15 @@ Read `project-description.md` first. It says *what* the app does. This file says
 - **First service:** `services/claude.conf` — working with real data since
   2026-11-13 (cookie from keep-sessions, see 4.6): 5-hour, week, and the
   per-model weekly limit (`limits[kind=weekly_scoped]`).
+- **Claude subscription end (2026-11-15):** step `plan` reads
+  `GET /api/organizations/{org}/subscription_details` (same cookie). It gives
+  `plan_ending_at` (set when the plan is cancelled; it ends then) and
+  `next_charge_at` (next renewal, ISO UTC, e.g. `2026-12-05T09:30:01Z`).
+  A `days` indicator uses `{{plan_end|or:next_charge}}` → `19 days (12/5 13:00)`.
+  404 is allowed, so a missing endpoint only hides the cell.
+- **Always on top (2026-11-15):** tray menu item with a check mark. Adds
+  `WS_EX_TOPMOST` to the table window (and `SetWindowPos` when it is open).
+  Saved as `[window] topmost=0/1` in `usage-monitor.ini`. No memory cost.
 - **Table UI (2026-11-14):** columns Service | Remained… | Updated (green/red,
   error in tooltip) | refresh button. Tray left-click toggles the window.
   Window is sized to the data on each open.
@@ -226,7 +235,7 @@ if (GetLastError() == ERROR_ALREADY_EXISTS) {
 - `NOTIFYICONDATAW` with `NOTIFYICON_VERSION_4`, callback `WM_APP_TRAY`.
 - `WM_LBUTTONUP` / `NIN_SELECT` / `NIN_KEYSELECT` → Open.
 - `WM_CONTEXTMENU` → popup menu: **Open** (default, `SetMenuDefaultItem`),
-  **Settings**, separator, **Exit**. Call `SetForegroundWindow` before
+  **Settings**, **Always on top** (checked when on), separator, **Exit**. Call `SetForegroundWindow` before
   `TrackPopupMenu` and post `WM_NULL` after (otherwise the menu does not close).
 - **Settings** → create `services\` if missing, then
   `ShellExecuteW(nullptr, L"open", servicesDir, …)`.
@@ -327,6 +336,7 @@ week_start=sat           ; first day of the week in the report: sun..sat; defaul
 spike_sound=             ; .wav file for a usage spike; empty = the Windows "Exclamation" sound
 [window]                 ; written by the app: last window position
 left=... top=... right=... bottom=... maximized=0
+topmost=0                ; tray menu "Always on top" (1 = table window stays above others)
 ```
 
 Time handling has exactly two steps, so nothing is converted twice:
@@ -383,6 +393,7 @@ Used in `url`, `header.*`, `body`, `form.*`, and indicator keys:
 | `{{cred.user:TARGET}}` | user name of that credential |
 | `{{file:PATH}}` | content of a local file, trimmed |
 | `{{x\|url}}` | URL-encode the value |
+| `{{a\|or:b}}` | value of `a`, or of variable `b` when `a` is empty |
 
 Store a secret once, not in the `.conf` file:
 `powershell -File tools\set-secret.ps1 -Target UsageMonitor/ISP -User myname`

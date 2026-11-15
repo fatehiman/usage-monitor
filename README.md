@@ -2,11 +2,12 @@
 
 A very small Windows tray app (C++ / plain Win32, about 1 MB, a few MB of RAM)
 that checks websites and APIs on a timer and shows how much quota or balance is
-left — for example Claude usage limits, ElevenLabs credits and plan days left, the USD balance of Soniox,
+left — for example Claude usage limits and subscription end date, ElevenLabs credits and plan days left, the USD balance of Soniox,
 DeepSeek and OpenRouter API accounts, the IRT balance (and SMS left) of the MsgWay and
 MihanSMS accounts, and the USDT wallet of the Asale client on the LAN box deb21.
 
-- One table window, one row per service. Services are `.conf` files (INI) in
+- One table window, one row per service. Tray menu: Open, Settings,
+  Always on top (on/off), Exit. Services are `.conf` files (INI) in
   `services\` next to the exe; no settings window.
 - Secrets are read from Windows Credential Manager (`{{cred:NAME}}`), never
   written in the `.conf` files.

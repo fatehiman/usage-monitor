@@ -81,6 +81,9 @@ bool expand(Ctx& c, const std::string& in, std::string& out) {
             std::string f = lower(trim(parts[k]));
             if (f == "url") v = urlEncode(v);
             else if (f == "trim") v = trim(v);
+            else if (startsWith(f, "or:")) {  // {{a|or:b}} = a, or b when a is empty
+                if (trim(v).empty() && !resolve(c, trim(parts[k]).substr(3), v)) return false;
+            }
             else { c.err = "Unknown filter: " + f; return false; }
         }
         out += v;

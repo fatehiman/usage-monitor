@@ -81,6 +81,12 @@ bool expand(Ctx& c, const std::string& in, std::string& out) {
             std::string f = lower(trim(parts[k]));
             if (f == "url") v = urlEncode(v);
             else if (f == "trim") v = trim(v);
+            else if (startsWith(f, "map:")) {  // {{a|map:Fable=Fbl,Opus=Ops}} = short name for a known value
+                for (auto& pair : split(trim(parts[k]).substr(4), ',')) {
+                    size_t eq = pair.find('=');
+                    if (eq != std::string::npos && trim(pair.substr(0, eq)) == trim(v)) { v = trim(pair.substr(eq + 1)); break; }
+                }
+            }
             else if (startsWith(f, "or:")) {  // {{a|or:b}} = a, or b when a is empty
                 if (trim(v).empty() && !resolve(c, trim(parts[k]).substr(3), v)) return false;
             }
@@ -470,7 +476,7 @@ bool formatIndicator(Ctx& c, const Section& ind, IndVal& out) {
         double mx;
         if (num(c, ind, "max", mx) == 1 && mx != 0) out.pie = value * 100 / mx;  // pie needs a maximum
     } else if (type == "days") {
-        // Days left until a date (plan end / renewal), e.g. "23 days (12/7)".
+        // Days left until a date (plan end / renewal), e.g. "23d (12/7 4:05)", "5h" on the last day.
         const KV* d = ind.find("date");
         std::string v;
         if (!d) { c.err = "indicator " + ind.id + ": days needs 'date'"; return false; }
@@ -479,14 +485,14 @@ bool formatIndicator(Ctx& c, const Section& ind, IndVal& out) {
         if (!t) { c.err = "indicator " + ind.id + ": date is not a time: '" + trim(v).substr(0, 30) + "'"; return false; }
         double days = (double)(t - time(nullptr)) / 86400.0;
         if (days < 0) val = "expired";
-        else if (days < 1) val = std::to_string((int)(days * 24)) + " h";
-        else val = std::to_string((int)days) + ((int)days == 1 ? " day" : " days");
+        else if (days < 1) val = std::to_string((int)(days * 24)) + "h";
+        else val = std::to_string((int)days) + "d";
         if (reset.empty()) {
             const TimeZone& show = appTimeZone() ? *appTimeZone() : c.s->tz;
             reset = U(shortTime(t, show, true, true));
         }
         out.num = days;
-        out.post = " days";
+        out.post = "d";
         out.history = false;  // a countdown, not usage
         out.level = levelOf(ind, days);
         double mx;

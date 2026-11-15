@@ -67,8 +67,8 @@ the stack comparison.
 +- Usage Monitor -----------------------------------------------------------------+
 | Service        | Remained                                   | Updated |    |    |
 |----------------+--------------------------------------------+---------+----+----|
-| (i) Claude     | (o) 91% 5h (13:30) | (o) 8% Week (Tue 4:00) | 10:13   | [R]| [H]|
-| (i) Home FTTH  | (o) 25 GB / 500 GB Data | 12 days          | 11/13 9:05 | [R]| [H]|
+| (i) Claude     | (o) 91% 5h (13:30) | (o) 8% W. (Tue 4:00)   | 10:13   | [R]| [H]|
+| (i) Home FTTH  | (o) 25 GB / 500 GB Data | 12d              | 11/13 9:05 | [R]| [H]|
 | (i) DeepSeek   | $3.89                                       | Error   | [R]| [H]|
 +---------------------------------------------------------------------------------+
   (o) = small pie of the remaining part, [R] = refresh button, [H] = usage report
@@ -82,9 +82,13 @@ the stack comparison.
   it (`invert = 1` for percent, `used` + `total` for ratio). This applies to every
   future service.
 - **Rule: no words like `left` / `remaining` in the cells.** The column title
-  "Remained" already says it: `$3.89`, `23 days (12/7 4:05)`, not `$3.89 left`.
-- Short cell text: `<value> <label> (<reset time>)`, e.g. `64% Fable (Tue 4:00)`.
-  Keep labels short (`5h`, `Week`, `Data`).
+  "Remained" already says it: `$3.89`, `23d (12/7 4:05)`, not `$3.89 left`.
+- Short cell text: `<value> <label> (<reset time>)`, e.g. `64% Fbl (Tue 4:00)`.
+  Keep labels and units short to save width (`5h`, `W.`, `Fbl`, `cr.`, `Data`).
+  Days are written `21d` (no space), the last day `5h`. Long names from an API
+  can be shortened with the `|map:` filter (Claude: `Fable` → `Fbl`).
+- Narrow cells: the gap between the pie and the text, and between the service
+  icon and its name, is small (2 px at 100 %); columns have little right padding.
 - **Updated** column: time of the last successful update, green when the last
   run was OK, red when it failed (the error is in the tooltip). Format without
   year and without leading zeros except minutes: `10:13` today, `11/13 9:05`
@@ -121,9 +125,9 @@ the stack comparison.
 | Type | Shows | Example |
 |---|---|---|
 | `ratio` | remaining / total | `25 GB / 500 GB` |
-| `value` | one number (balance, days, count) | `$24.56`, `12 days` |
+| `value` | one number (balance, days, count) | `$24.56`, `34,606 cr.` |
 | `percent` | a percent | `25%` |
-| `days` | days left until a date | `23 days (12/7 4:05)` |
+| `days` | days left until a date | `23d (12/7 4:05)` |
 
 ## Services are defined in `.conf` files
 

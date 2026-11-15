@@ -414,7 +414,7 @@ static void autoSizeColumns() {
     int pad = dpiScale(14);
     HWND hdr = ListView_GetHeader(g_list);
     RECT c0 = cellRect(0, 0);
-    int pieExtra = (ListView_GetItemCount(g_list) ? pieSize(c0) : dpiScale(14)) + dpiScale(6);
+    int pieExtra = (ListView_GetItemCount(g_list) ? pieSize(c0) : dpiScale(14)) + dpiScale(2);
     for (int c = 0; c < colRefresh(); c++) {
         ListView_SetColumnWidth(g_list, c, LVSCW_AUTOSIZE);
         int w = ListView_GetColumnWidth(g_list, c);
@@ -426,11 +426,11 @@ static void autoSizeColumns() {
         Header_GetItem(hdr, c, &hi);
         int hw = ListView_GetStringWidth(g_list, buf) + pad;
         if (isIndCol(c)) w += pieExtra;
-        if (c == 0) w += g_iconSize + dpiScale(10);
+        if (c == 0) w += g_iconSize + dpiScale(6);
         if (c == colUpdated())
             for (char sp : g_rowSpike)
                 if (sp) { w += badgeSize() + dpiScale(6); break; }
-        ListView_SetColumnWidth(g_list, c, (w > hw ? w : hw) + pad / 2);
+        ListView_SetColumnWidth(g_list, c, (w > hw ? w : hw) + pad / 4);
     }
     ListView_SetColumnWidth(g_list, colRefresh(), dpiScale(20) + dpiScale(10));
     ListView_SetColumnWidth(g_list, colReport(), dpiScale(20) + dpiScale(14));
@@ -661,7 +661,7 @@ static void paintIndicatorCell(HDC dc, int row, int col, const Cell& cell) {
     wchar_t buf[512] = L"";
     ListView_GetItemText(g_list, row, col, buf, 512);
     RECT tr = rc;
-    tr.left = x + ps + dpiScale(6);
+    tr.left = x + ps + dpiScale(2);  // small gap between pie and text
     tr.right -= dpiScale(4);
     HGDIOBJ old = SelectObject(dc, g_font);
     SetBkMode(dc, TRANSPARENT);
@@ -680,7 +680,7 @@ static void paintNameCell(HDC dc, int row) {
     wchar_t buf[256] = L"";
     ListView_GetItemText(g_list, row, 0, buf, 256);
     RECT tr = rc;
-    tr.left = x + s + dpiScale(6);
+    tr.left = x + s + dpiScale(2);  // small gap between icon and name
     tr.right -= dpiScale(4);
     HGDIOBJ old = SelectObject(dc, g_font);
     SetBkMode(dc, TRANSPARENT);

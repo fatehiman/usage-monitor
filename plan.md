@@ -16,7 +16,7 @@ Read `project-description.md` first. It says *what* the app does. This file says
   `GET /api/organizations/{org}/subscription_details` (same cookie). It gives
   `plan_ending_at` (set when the plan is cancelled; it ends then) and
   `next_charge_at` (next renewal, ISO UTC, e.g. `2026-12-05T09:30:01Z`).
-  A `days` indicator uses `{{plan_end|or:next_charge}}` → `19 days (12/5 13:00)`.
+  A `days` indicator uses `{{plan_end|or:next_charge}}` → `19d (12/5 13:00)`.
   404 is allowed, so a missing endpoint only hides the cell.
 - **Always on top (2026-11-15):** tray menu item with a check mark. Adds
   `WS_EX_TOPMOST` to the table window (and `SetWindowPos` when it is open).
@@ -49,7 +49,11 @@ Read `project-description.md` first. It says *what* the app does. This file says
   Manager (`UsageMonitor/ElevenLabs`, from Bitwarden `Elevenlabs`). Credits left
   (`character_limit − character_count`, pie with `max`) + days left until the plan
   renews / ends (new indicator type `days`, see 4.5). No `label = left` on the days
-  either (removed 2026-11-14): the cell is `22 days (12/7 4:05)`.
+  either (removed 2026-11-14): the cell is `22d (12/7 4:05)`.
+- **Narrower table (2026-11-15):** days as `21d` / `5h`, labels `W.` and
+  `Fbl` (`{{model_name|map:Fable=Fbl}}`), ElevenLabs `unit = cr.`. Pie→text and
+  icon→name gap 6 → 2 px, column right padding `pad/2` → `pad/4`
+  (`autoSizeColumns`). Window 825 → 734 px wide.
 - **Asale (2026-11-14):** `services/asale.conf`, USDT wallet of the Asale client on
   deb21 (`E:\www\myLan\deb21.md`): `POST http://192.168.1.21:9700/rpc/wallet_overview`
   with header `X-Asale-Token` = `/root/.asale/daemon.token`, copied once to Credential
@@ -393,6 +397,7 @@ Used in `url`, `header.*`, `body`, `form.*`, and indicator keys:
 | `{{cred.user:TARGET}}` | user name of that credential |
 | `{{file:PATH}}` | content of a local file, trimmed |
 | `{{x\|url}}` | URL-encode the value |
+| `{{a\|map:X=Y,P=Q}}` | `Y` when the value is `X` (short names), else the value unchanged |
 | `{{a\|or:b}}` | value of `a`, or of variable `b` when `a` is empty |
 
 Store a secret once, not in the `.conf` file:
@@ -408,9 +413,9 @@ in a cell** (`label`, `text`, `suffix`): the column title already says it.
 
 | Key | Used by | Meaning |
 |---|---|---|
-| `label` | all | Short text **after** the value: cell = `<value> <label> (<reset>)`, e.g. `64% Fable (Tue 4:00)`. |
+| `label` | all | Short text **after** the value: cell = `<value> <label> (<reset>)`, e.g. `64% Fbl (Tue 4:00)`. |
 | `type` | all | `ratio`, `value`, `percent`, or `days`. |
-| `date` | days | A time (ISO 8601 or epoch) when the plan ends / renews. Shows `23 days (12/7 4:05)`, `5 h` on the last day, `expired` after it. Colors (`warn_below` …) compare the days left. Not written to the history log. |
+| `date` | days | A time (ISO 8601 or epoch) when the plan ends / renews. Shows `23d (12/7 4:05)`, `5h` on the last day, `expired` after it. Colors (`warn_below` …) compare the days left. Not written to the history log. |
 | `remain` / `used` | ratio | Give one. If `used` is given: remain = total − used. |
 | `total` | ratio | Total amount. |
 | `value` | value | The number. Or give `total` + `used`: value = total − used. |

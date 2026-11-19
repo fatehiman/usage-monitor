@@ -12,6 +12,7 @@
 struct AppSettings {
     int historyDays = 30;  // history_days = 30    keep / read this many days of logs
     int weekStart = 6;     // week_start = sat     first day of the week in the report (0 = Sun .. 6 = Sat)
+    std::string exitCountry;  // exit_country = Iran   fetch only while the exit IP is in this country (empty = no check)
     std::string spikeSound;  // spike_sound = C:\x.wav   sound of a usage spike (empty = Windows "Exclamation")
 };
 

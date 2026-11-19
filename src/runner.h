@@ -28,6 +28,7 @@ struct Result {
     bool ok = false;       // last run succeeded
     bool stale = false;    // inds are from an older successful run
     bool running = false;
+    bool blocked = false;  // last run did not fetch: exit IP country is not [app] exit_country (or unknown)
     time_t updated = 0;    // time of the last successful run
     // Last usage spike (src/spike.cpp). Shown as "!" next to the Updated time until the user
     // clicks it. spikeAt = 0: no spike to show.

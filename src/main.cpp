@@ -136,6 +136,7 @@ static DWORD WINAPI Worker(LPVOID) {
 
             ULONGLONG interval = (ULONGLONG)svcs[i].intervalMin * 60000;
             if (!ok && interval > 5 * 60000) interval = 5 * 60000;  // retry sooner after an error
+            if (r.blocked) interval = 30000;  // paused (wrong exit country): look again soon
             due[i] = GetTickCount64() + interval;
             ran = true;
         }
@@ -259,6 +260,48 @@ static HICON loadAppIcon(int cx, int cy) {
     return (HICON)LoadImageW(g_inst, MAKEINTRESOURCEW(1), IMAGE_ICON, cx, cy, LR_DEFAULTCOLOR);
 }
 
+// Gray copy of the app icon (same alpha), shown while fetching is paused by [app] exit_country.
+static HICON makeGrayIcon(HICON src) {
+    ICONINFO ii{};
+    if (!src || !GetIconInfo(src, &ii)) return nullptr;
+    HICON out = nullptr;
+    BITMAP bm{};
+    if (GetObjectW(ii.hbmColor, sizeof bm, &bm) && bm.bmWidth > 0 && bm.bmHeight > 0) {
+        BITMAPINFO bi{};
+        bi.bmiHeader.biSize = sizeof bi.bmiHeader;
+        bi.bmiHeader.biWidth = bm.bmWidth;
+        bi.bmiHeader.biHeight = -bm.bmHeight;
+        bi.bmiHeader.biPlanes = 1;
+        bi.bmiHeader.biBitCount = 32;
+        bi.bmiHeader.biCompression = BI_RGB;
+        std::vector<DWORD> px((size_t)bm.bmWidth * bm.bmHeight);
+        HDC dc = GetDC(nullptr);
+        if (GetDIBits(dc, ii.hbmColor, 0, bm.bmHeight, px.data(), &bi, DIB_RGB_COLORS)) {
+            for (auto& p : px) {
+                DWORD a = p >> 24, r = (p >> 16) & 255, g = (p >> 8) & 255, b = p & 255;
+                DWORD y = (r * 30 + g * 59 + b * 11) / 100;
+                y = 70 + y * 120 / 255;  // soft gray, not too dark
+                p = (a << 24) | (y << 16) | (y << 8) | y;
+            }
+            SetDIBits(dc, ii.hbmColor, 0, bm.bmHeight, px.data(), &bi, DIB_RGB_COLORS);
+            out = CreateIconIndirect(&ii);
+        }
+        ReleaseDC(nullptr, dc);
+    }
+    DeleteObject(ii.hbmColor);
+    DeleteObject(ii.hbmMask);
+    return out;
+}
+
+static HICON g_iconColor, g_iconGray;
+static bool g_paused = false;  // some service is paused: exit IP is not in [app] exit_country
+
+static HICON trayIcon() {
+    if (!g_iconColor) g_iconColor = loadAppIcon(GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
+    if (g_paused && !g_iconGray) g_iconGray = makeGrayIcon(g_iconColor);
+    return g_paused && g_iconGray ? g_iconGray : g_iconColor;
+}
+
 static void addTray() {
     g_nid = NOTIFYICONDATAW{};
     g_nid.cbSize = sizeof g_nid;
@@ -266,7 +309,7 @@ static void addTray() {
     g_nid.uID = 1;
     g_nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
     g_nid.uCallbackMessage = WM_APP_TRAY;
-    g_nid.hIcon = loadAppIcon(GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
+    g_nid.hIcon = trayIcon();
     wcscpy_s(g_nid.szTip, kTitle);
     Shell_NotifyIconW(NIM_ADD, &g_nid);
     g_nid.uVersion = NOTIFYICON_VERSION_4;
@@ -275,13 +318,16 @@ static void addTray() {
 
 static void updateTip() {
     std::wstring tip = kTitle;
+    bool paused = false;
     AcquireSRWLockShared(&g_lock);
     for (size_t i = 0; i < g_services.size(); i++) {
         const Result& r = g_results[i];
         std::string line;
         for (auto& v : r.inds)
             if (v.tray) line += (line.empty() ? "" : ", ") + v.text;
-        if (!r.ok && r.status != "Waiting") line += (line.empty() ? "" : " - ") + std::string("error");
+        paused = paused || r.blocked;
+        if (r.blocked) line += (line.empty() ? "" : " - ") + std::string("paused");
+        else if (!r.ok && r.status != "Waiting") line += (line.empty() ? "" : " - ") + std::string("error");
         if (r.spikeAt) line = "(!) " + line;  // usage spike, not cleared yet
         if (!line.empty()) tip += L"\n" + W(g_services[i].name + ": " + line);
     }
@@ -289,6 +335,11 @@ static void updateTip() {
     if (tip.size() > 127) tip = tip.substr(0, 124) + L"...";
     wcscpy_s(g_nid.szTip, tip.c_str());
     g_nid.uFlags = NIF_TIP | NIF_SHOWTIP;
+    if (paused != g_paused) {  // gray icon while paused
+        g_paused = paused;
+        g_nid.hIcon = trayIcon();
+        g_nid.uFlags |= NIF_ICON;
+    }
     Shell_NotifyIconW(NIM_MODIFY, &g_nid);
 }
 

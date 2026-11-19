@@ -1,5 +1,6 @@
 #include "runner.h"
 #include "crypto.h"
+#include "history.h"
 #include "http.h"
 #include "json.h"
 #include "util.h"
@@ -522,6 +523,26 @@ bool formatIndicator(Ctx& c, const Section& ind, IndVal& out) {
     return true;
 }
 
+// Asks the country service (hardcoded) where the exit IP is. It answers the country name as text.
+bool countryAllowed(HttpSession& http, const Service& s, const std::string& want, std::string& err) {
+    HttpReq rq;
+    rq.url = "https://ip2.peppasoft.com/?c=2";
+    rq.timeoutSec = s.timeoutSec;
+    rq.maxBody = 4096;
+    HttpResp rs;
+    if (!http.send(rq, rs) || rs.status != 200) {
+        err = "Paused: cannot check the exit IP country (" + (rs.error.empty() ? "HTTP " + std::to_string(rs.status) : rs.error) + ")";
+        return false;
+    }
+    std::string got = trim(rs.body);
+    if (got.empty() || got.size() > 60) { err = "Paused: cannot check the exit IP country (bad answer)"; return false; }
+    if (lower(got) != lower(want)) {
+        err = "Paused: exit IP is in " + got + ", need " + want;
+        return false;
+    }
+    return true;
+}
+
 }  // namespace
 
 bool runService(const Service& s, Result& r) {
@@ -530,8 +551,14 @@ bool runService(const Service& s, Result& r) {
     bool ok = true;
     {
         HttpSession http(s.userAgent, s.proxy);
-        for (auto& st : s.steps)
-            if (!runStep(c, http, st)) { ok = false; break; }
+        r.blocked = false;
+        // [app] exit_country: check the exit IP country right before the steps, on the same
+        // proxy and with no gap, so the exit IP cannot change between the check and the request.
+        const std::string& want = appSettings().exitCountry;
+        if (!want.empty() && !countryAllowed(http, s, want, c.err)) { ok = false; r.blocked = true; }
+        if (ok)
+            for (auto& st : s.steps)
+                if (!runStep(c, http, st)) { ok = false; break; }
     }
     std::vector<IndVal> inds;
     if (ok) {
@@ -560,10 +587,11 @@ bool runService(const Service& s, Result& r) {
         r.updated = time(nullptr);
         logLine(s.file + ": OK");
     } else {
+        std::string old = r.status;
         r.status = c.err.empty() ? "Unknown error" : c.err;
         r.ok = false;
         r.stale = !r.inds.empty();
-        logLine(s.file + ": " + r.status);
+        if (!r.blocked || old != r.status) logLine(s.file + ": " + r.status);  // a paused service logs once
     }
     return ok;
 }

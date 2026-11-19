@@ -31,6 +31,9 @@ void loadAppSettings() {
     for (int i = 0; i < 7; i++)
         if (ws == days[i]) g_app.weekStart = i;
 
+    GetPrivateProfileStringW(L"app", L"exit_country", L"", buf, 128, ini.c_str());
+    g_app.exitCountry = trim(U(buf));
+
     wchar_t snd[MAX_PATH] = L"";
     GetPrivateProfileStringW(L"app", L"spike_sound", L"", snd, MAX_PATH, ini.c_str());
     g_app.spikeSound = expandEnv(trim(U(snd)));

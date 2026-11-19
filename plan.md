@@ -338,6 +338,9 @@ timezone=Asia/Tehran     ; display zone for ALL times (reset times, Updated, rep
 history_days=30          ; keep (and read in the report) this many days of history logs; default 30
 week_start=sat           ; first day of the week in the report: sun..sat; default sat
 spike_sound=             ; .wav file for a usage spike; empty = the Windows "Exclamation" sound
+exit_country=            ; e.g. Iran. Before EVERY service run, ask https://ip2.peppasoft.com/?c=2 (same proxy,
+                         ; no gap) for the exit IP country name; if different (or unknown) the run is skipped,
+                         ; row "Paused: ...", tray icon gray, retry in 30 s. Empty = no check.
 [window]                 ; written by the app: last window position
 left=... top=... right=... bottom=... maximized=0
 topmost=0                ; tray menu "Always on top" (1 = table window stays above others)

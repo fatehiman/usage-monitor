@@ -97,6 +97,15 @@ the stack comparison.
   used to read API times). The app has one display zone for all times:
   `usage-monitor.ini` → `[app] timezone=Asia/Tehran`. Without it, reset times
   are shown in the service zone and Updated in the PC zone.
+- Exit country guard: `usage-monitor.ini` → `[app] exit_country=Iran`. Empty = no
+  check. When set, EVERY fetch of EVERY service first asks
+  `https://ip2.peppasoft.com/?c=2` (hardcoded; answers the country name, e.g.
+  `Poland`) through the same proxy as the service, then sends the service
+  requests at once (no gap, because some services dislike an exit IP change).
+  The name is compared without case. If the country is different, or cannot be
+  checked: no request goes to the service, the row shows "Paused: exit IP is in
+  Poland, need Iran" (old values stay, marked stale), the tray icon turns gray
+  (while any service is paused) and the service is tried again after 30 seconds.
 - Colors: normal text; orange when low (`warn_below`); red when very low
   (`alert_below`); grey when the value is old (last fetch failed).
 - The window opens at its last position (see the table above), sized to fit its
